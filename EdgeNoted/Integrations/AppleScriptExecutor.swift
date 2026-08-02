@@ -54,6 +54,17 @@ actor AppleScriptExecutor {
             return theString as text
         end jsonFromObject
 
+        -- Converts an AppleScript date to a Unix epoch. `timeIntervalSince1970()`
+        -- does not work on the plain AppleScript date values Notes/Reminders
+        -- return; instead the date is passed to a Cocoa method (AppleScript
+        -- auto-bridges dates to NSDate there) and measured against the
+        -- 2001-01-01 reference date, which is timezone and DST correct.
+        on epochOf(theDate)
+            set refDate to current application's NSDate's dateWithTimeIntervalSince1970:978307200
+            set interval to refDate's timeIntervalSinceDate:theDate
+            return (978307200 - interval) as real
+        end epochOf
+
         on run argv
             if (count of argv) is 0 then
                 return "ERR:noargs"
@@ -95,7 +106,7 @@ actor AppleScriptExecutor {
                         set theBody to body of theNote
                         set theName to name of theNote
                         set theMod to modification date of theNote
-                        set epoch to theMod's timeIntervalSince1970() as real
+                        set epoch to my epochOf(theMod)
                         return my jsonFromObject({idStr:noteID, nameStr:theName, bodyStr:theBody, modEpoch:epoch})
                     on error errMsg
                         return my jsonFromObject({errorStr:errMsg})
@@ -165,7 +176,7 @@ actor AppleScriptExecutor {
                             set priStr to ""
                             try
                                 set d to due date of r
-                                set dueStr to ((d's timeIntervalSince1970()) as real) as text
+                                set dueStr to (my epochOf(d)) as text
                             end try
                             try
                                 set priStr to (priority of r) as text

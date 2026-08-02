@@ -1,4 +1,4 @@
-.PHONY: generate format lint analyze dead-code test build run precommit clean
+.PHONY: generate format lint analyze dead-code test build run backup-notes precommit clean
 
 generate:
 	xcodegen generate
@@ -29,6 +29,10 @@ run: build
 	for i in $$(seq 1 50); do pgrep -x EdgeNoted >/dev/null || break; sleep 0.1; done; \
 	pgrep -x EdgeNoted >/dev/null && { echo "EdgeNoted did not quit in time" >&2; exit 1; }; \
 	open "Build/EdgeNoted.app"
+
+# Back up every Apple Notes note to ~/Documents/EdgeNoted Backup/<timestamp>/
+backup-notes:
+	@bash Scripts/backup-notes.sh
 
 precommit: format lint analyze dead-code test
 

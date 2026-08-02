@@ -56,6 +56,24 @@ make build       # compile with SwiftPM + create Build/EdgeNoted.app (signed)
 make run         # build (if needed) and launch the app
 ```
 
+## Backing up your notes
+
+```bash
+make backup-notes          # or: bash Scripts/backup-notes.sh
+```
+
+Backs up every Apple Notes note to a timestamped folder under
+`~/Documents/EdgeNoted Backup/backup-<timestamp>/`:
+
+- The folder structure is mirrored (`<Folder>/<Note>.html`), including nested
+  folders; notes outside any folder land in `No Folder/`.
+- Each note is saved as its **raw HTML body** (the most faithful restore
+  format) with deduplication, safe file names, and collision handling.
+- A `manifest.tsv` lists folder, name, id, and file path for every note.
+- It is **read-only on Apple Notes** — it only writes inside the backup folder.
+
+## Common tasks
+
 Or step by step:
 
 ```bash
@@ -86,6 +104,7 @@ xcodegen generate
 ```bash
 make build       # compile with SwiftPM + create .app bundle
 make run         # build and launch the app
+make backup-notes # back up all Apple Notes to ~/Documents/EdgeNoted Backup
 make format      # auto-format all Swift files
 make lint        # run SwiftLint syntax rules (--strict)
 make analyze     # run SwiftLint analyzer rules after a clean full compile

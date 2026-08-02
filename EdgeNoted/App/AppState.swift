@@ -271,7 +271,8 @@ final class AppState {
         guard id != selectedNoteID else { return }
         // Persist unsaved edits of the current note before switching, using a
         // snapshot so the async save can't pick up the next note's content.
-        if let pending = pendingSaveNoteID, pending != id {
+        // Only a genuinely dirty note is flushed - never an untouched draft.
+        if let pending = pendingSaveNoteID, pending != id, sync.isDirty {
             saveDebouncer?.cancel()
             let snapshotTitle = draftTitle
             let snapshotBody = draftBody
@@ -356,8 +357,12 @@ final class AppState {
 
     private func markDirty() {
         guard let noteID = selectedNoteID, !noteIsReadOnly else { return }
-        pendingSaveNoteID = noteID
         sync.edit(localBody: draftBody)
+        // pendingSaveNoteID tracks whether there are genuine unsaved edits.
+        // Programmatic draft fills (opening a note, adopting a remote change)
+        // route through here with an unchanged hash and must not mark the note
+        // as needing a save.
+        pendingSaveNoteID = sync.isDirty ? noteID : nil
         isSaving = false
         lastSavedAt = nil
         saveDebouncer?.schedule()
@@ -508,6 +513,10 @@ final class AppState {
 
     func flushPendingSave() async {
         saveDebouncer?.cancel()
+        // Only flush when there are genuine unsaved edits. Never force-write
+        // an untouched (possibly empty) draft, which could wipe note content
+        // when the panel hides.
+        guard sync.isDirty else { return }
         await saveNoteNow(force: true)
     }
 

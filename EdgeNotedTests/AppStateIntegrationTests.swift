@@ -127,6 +127,36 @@ struct AppStateIntegrationTests {
         #expect(second.body == "Other body")
     }
 
+    @Test("Hiding without edits never writes the note back")
+    func hideWithoutEditsDoesNotWrite() async throws {
+        let harness = try await makeHarness()
+        await harness.state.startup()
+        harness.state.selectNote("n1")
+        await waitForNoteOpen(harness.state)
+        let before = try await harness.notes.fetchNote(id: "n1")
+        await harness.state.flushPendingSave()
+        let after = try await harness.notes.fetchNote(id: "n1")
+        #expect(after.body == "Discuss roadmap")
+        // The modification epoch is unchanged, proving no write occurred.
+        #expect(after.modificationEpoch == before.modificationEpoch)
+    }
+
+    @Test("A note that failed to load is never wiped on hide")
+    func failedLoadIsNotWiped() async throws {
+        let harness = try await makeHarness()
+        await harness.state.startup()
+        harness.state.selectNote("does-not-exist")
+        for _ in 0..<100 {
+            await Task.yield()
+        }
+        // Draft could not be loaded; hiding must not force-write it.
+        await harness.state.flushPendingSave()
+        let all = try await harness.notes.fetchNotes(folderName: nil)
+        #expect(all.count == 1)
+        let existing = try await harness.notes.fetchNote(id: "n1")
+        #expect(existing.body == "Discuss roadmap")
+    }
+
     @Test("Remote title-only edits are adopted on a clean draft")
     func titleOnlyEditAdopted() async throws {
         let harness = try await makeHarness()
