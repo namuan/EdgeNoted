@@ -1,0 +1,4 @@
+# Finds unused code (dead types, functions, properties) across the whole
+# target graph — something SwiftLint can't do on its own.
+# Run with: periphery scan --config .periphery.yml
+disable_update_check: true

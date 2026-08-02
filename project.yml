@@ -1,0 +1,73 @@
+name: EdgeNoted
+options:
+  bundleIdPrefix: com.github.namuan
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+packages:
+  SwiftLintPlugin:
+    url: https://github.com/realm/SwiftLint
+    from: 0.55.0
+
+targets:
+  EdgeNoted:
+    type: application
+    platform: macOS
+    sources:
+      - path: EdgeNoted
+    resources:
+      - path: EdgeNoted/Resources/Assets.xcassets
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.github.namuan.edgenoted
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        SWIFT_VERSION: "6.0"
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_ENTITLEMENTS: EdgeNoted/Resources/EdgeNoted.entitlements
+    info:
+      path: SupportingFiles/EdgeNoted.Info.plist
+      properties:
+        CFBundleDisplayName: EdgeNoted
+        LSMinimumSystemVersion: "14.0"
+    buildToolPlugins:
+      - plugin: SwiftLintBuildToolPlugin
+        package: SwiftLintPlugin
+
+  EdgeNotedTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: EdgeNotedTests
+    dependencies:
+      - target: EdgeNoted
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: YES
+
+  EdgeNotedUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: EdgeNotedUITests
+    dependencies:
+      - target: EdgeNoted
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  EdgeNoted:
+    build:
+      targets:
+        EdgeNoted: all
+        EdgeNotedTests: [test]
+        EdgeNotedUITests: [test]
+    test:
+      targets:
+        - EdgeNotedTests
+        - EdgeNotedUITests
+    run:
+      config: Debug

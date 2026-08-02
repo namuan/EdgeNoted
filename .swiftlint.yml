@@ -1,0 +1,24 @@
+excluded:
+  - .build
+  - DerivedData
+  - "**/.build"
+
+opt_in_rules:
+  - force_unwrapping
+  - empty_count
+  - closure_spacing
+  - contains_over_first_not_nil
+
+disabled_rules:
+  - line_length
+  - todo
+
+# swift format (Apple's formatter) emits trailing commas in multiline
+# collections per SE-0383, so tell SwiftLint to require them too; otherwise
+# the formatter and linter fight each other on every commit.
+trailing_comma:
+  mandatory_comma: true
+
+analyzer_rules:
+  - unused_import
+  - unused_declaration
