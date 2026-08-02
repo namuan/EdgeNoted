@@ -16,7 +16,7 @@ let package = Package(
         .testTarget(
             name: "EdgeNotedTests",
             dependencies: ["EdgeNoted"],
-            path: "EdgeNotedTests"
-        )
+            path: "EdgeNotedTests",
+        ),
     ]
 )

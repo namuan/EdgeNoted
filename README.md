@@ -1,42 +1,84 @@
 # EdgeNoted
 
-Modern SwiftUI macOS app, scaffolded with a feature-based layout and
-lint/format/test automation wired up from the start.
+A lightweight, always-available macOS companion for your **Apple Notes** and
+**Apple Reminders**. EdgeNoted slides in from the edge of your screen, lets you
+view and edit a single note instantly, and hides again — no app switching.
 
-## Quick start (SPM)
+## What it does
 
-Build and run without ever opening Xcode:
+- **Always-on-top edge panel.** Slides in from the left, right, or bottom edge
+  and stays above other apps, full-screen apps, and Stage Manager
+  (`.fullScreenAuxiliary` window behavior).
+- **Three ways to invoke it.**
+  - Global keyboard shortcut (default `⌃⇧N`, configurable)
+  - Click the thin "Open Bar" strip at the screen edge
+  - Hot Side: touch the chosen screen edge with the mouse
+- **Apple Notes, bidirectional.** EdgeNoted does not store your notes. It lists
+  your folders and notes, opens one note at a time, and writes your edits
+  straight back to Apple Notes. External edits made in Notes are picked up by
+  polling; if you are editing when the remote note changes, you choose
+  Keep Mine / Take Theirs / Open in Notes — nothing is overwritten silently.
+- **Apple Reminders.** Browse lists, view/create/edit/complete reminders, set
+  due dates and priorities, and quick-capture new ones.
+- **Local organization** (kept in EdgeNoted only, never touches your notes):
+  pinning notes and folders, reordering, folding notes, note colors (accent bar
+  or full background), themes (built-in + custom), snippets, and search.
+- **Extras:** color-code preview (`#rrggbb`/`#rgb` swatches), interactive
+  checklists (`- [ ]` / `- [x]`), and export the current note as a PNG image.
+- **Keyboard-first:** `⌘N` new note, `Esc` hide, all actions keyboard-accessible.
+- **File logging.** Diagnostics are written to rolling files in
+  `~/Library/Logs/EdgeNoted/` (`EdgeNoted.log` rotating to `EdgeNoted-1.log` …
+  `EdgeNoted-5.log` at ~1 MB each). Note bodies, titles, and reminder contents
+  are never logged. Reveal the folder from Settings > About > Logs.
+
+## Limitations (by design)
+
+Apple Notes only exposes **plain text** through AppleScript. Therefore:
+
+- Notes containing rich formatting/attachments are shown **read-only** with an
+  explicit "Convert to plain text" opt-in (conversion is destructive).
+- Images and attachments inside notes cannot be read or written by EdgeNoted.
+- Reordering inside Apple Notes itself is not supported; order lives locally.
+- This integration requires the Automation permission: the first time you use
+  the panel, macOS asks for access to control "Notes" and "Reminders"
+  (System Settings > Privacy & Security > Automation).
+
+EdgeNoted is **not sandboxed** (the app-sandbox entitlement was removed). It
+must drive other apps through Apple Events, and the sandbox prevented its
+AppleScript helper from launching Notes/Reminders (`-600`) and blocked writes
+to `~/Library/Logs`. As a utility that can never be distributed on the Mac App
+Store anyway, a non-sandboxed build is the correct trade-off.
+
+## Build & run (no Xcode required)
 
 ```bash
-make build       # compile with SwiftPM + create .app bundle
+make build       # compile with SwiftPM + create Build/EdgeNoted.app (signed)
 make run         # build (if needed) and launch the app
 ```
 
-Or step by step with SwiftPM directly:
+Or step by step:
 
 ```bash
-swift build -c release                              # compile
-bash Scripts/build-app.sh                            # create .app bundle
-open "Build/EdgeNoted.app"                          # launch it
+swift build -c release
+bash Scripts/build-app.sh
+open "Build/EdgeNoted.app"
 ```
 
-## First-time setup
+`make test` runs the full suite and requires XcodeGen (`brew install xcodegen`
+then `make generate`).
 
-Install the command-line tooling:
+## First-time setup
 
 ```bash
 brew install swiftlint periphery pre-commit
 pre-commit install
 ```
 
-XcodeGen is only needed for the XCTest UI-test target, the SwiftLint analyzer
-check, or if you want an Xcode project. It can be used entirely from the
-command line:
+XcodeGen is only needed for UI tests / Xcode integration:
 
 ```bash
 brew install xcodegen
 xcodegen generate
-open EdgeNoted.xcodeproj  # optional
 ```
 
 ## Common tasks
@@ -52,53 +94,46 @@ make test        # run unit + UI tests (requires xcodegen generate first)
 make precommit   # format + lint + analysis + dead-code + test
 ```
 
-## How it works
-
-This project uses **two build systems** side by side:
-
-| System | Manifest | Purpose |
-|---|---|---|
-| **SwiftPM** | `Package.swift` | Compile sources, run unit tests, produce executable |
-| **XcodeGen** | `project.yml` | Generate `.xcodeproj` for UI tests, full Xcode integration |
-
-A `Scripts/build-app.sh` script wraps `swift build` and assembles the
-compiled binary into a proper `.app` bundle with `Info.plist`, compiled
-asset catalogs, and resources — no Xcode required.
-
-## Code quality
-
-Regular SwiftLint rules run quickly from source with `make lint`. The
-`unused_import` and `unused_declaration` analyzer rules require a clean,
-full compile, so `make analyze` generates the Xcode project and captures an
-`xcodebuild` compiler log before running `swiftlint analyze`. It never
-requires the Xcode UI.
-
-`make dead-code` runs Periphery. Periphery reads `Package.swift`, builds all
-SwiftPM targets (including unit tests), and traverses their declaration graph
-to find unused classes, functions, properties, and other declarations.
-
-## Structure
+## Architecture notes
 
 ```
 EdgeNoted/
-├── App/            # App entry point, AppState
-├── Features/        # Feature-scoped views/view models
-├── Models/          # Data models
-├── Services/        # Persistence, networking, etc.
-├── DesignSystem/     # Shared colors, components
-└── Resources/        # Assets, Info.plist, entitlements
-EdgeNotedTests/       # Swift Testing unit tests
-EdgeNotedUITests/     # XCTest UI tests
-Scripts/
-├── build-app.sh              # macOS .app bundle builder (SPM-based)
-└── swiftlint-analyze.sh      # clean Xcode CLI build + SwiftLint analyzer rules
-.periphery.yml                # Periphery dead-code scan configuration
+├── App/            # App entry, AppState hub, ApplicationCoordinator (panel/hotkey wiring)
+├── Windowing/      # Edge panel, Open Bar, Hot Side monitor, Carbon global hotkey
+├── Integrations/   # AppleScript executor + Notes/Reminders services (protocols + AppleScript + fakes)
+├── Sync/           # NoteDraftSync state machine + Debouncer
+├── Persistence/    # SwiftData local metadata (pins, order, colors, snippets)
+├── Features/       # Panel, Notes, Reminders, Export, Settings views
+├── DesignSystem/   # Themes, hex color parsing
+└── Utilities/      # Note body classifier + renderer (checklists, hex chips)
 ```
 
-CI (`.github/workflows/ci.yml`) regenerates the Xcode project with XcodeGen,
-then runs regular SwiftLint, compiled SwiftLint analyzer rules, Periphery,
-a `swift format` check, and the full test suite on every PR.
+Key design decisions:
+
+- **AppleScript bridge is safe by construction.** The script is a single
+  constant string; all user data is passed as positional `argv` arguments, so
+  note text is never interpolated into AppleScript source. Structured results
+  come back as JSON.
+- **Apple Notes stays the source of truth.** Only opaque IDs and presentation
+  preferences are stored locally (SwiftData). Note bodies are never persisted.
+- **Conflict-safe sync.** Local edits are debounced and written back; a poll
+  that observes a remote change while edits are pending raises a conflict the
+  user resolves explicitly.
+- **UI tests run hermetic.** Launch with `-UITestFakeServices YES` and the app
+  uses in-memory fake Notes/Reminders services and disables real automation.
+
+## Manual acceptance checklist
+
+After building, verify with disposable content:
+
+1. First launch: approve the automation prompt for Notes and Reminders.
+2. Hotkey, Open Bar click, and Hot Side each show/hide the panel exactly once.
+3. Create/edit a text-only note in EdgeNoted and confirm it in Apple Notes;
+   edit the same note in Notes and confirm the change is adopted (or a conflict
+   banner appears if you were editing).
+4. Create/edit/complete a reminder and set a due date and priority.
+5. Export a note as a PNG and confirm the image renders.
 
 ## License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+MIT — see [LICENSE](LICENSE).

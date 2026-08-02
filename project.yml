@@ -5,11 +5,6 @@ options:
     macOS: "14.0"
   createIntermediateGroups: true
 
-packages:
-  SwiftLintPlugin:
-    url: https://github.com/realm/SwiftLint
-    from: 0.55.0
-
 targets:
   EdgeNoted:
     type: application
@@ -29,10 +24,11 @@ targets:
       path: SupportingFiles/EdgeNoted.Info.plist
       properties:
         CFBundleDisplayName: EdgeNoted
+        CFBundleShortVersionString: "1.6"
+        CFBundleVersion: "16"
         LSMinimumSystemVersion: "14.0"
-    buildToolPlugins:
-      - plugin: SwiftLintBuildToolPlugin
-        package: SwiftLintPlugin
+        LSUIElement: true
+        NSAppleEventsUsageDescription: EdgeNoted reads and writes your Apple Notes and Reminders so they stay in sync with the edge panel.
 
   EdgeNotedTests:
     type: bundle.unit-test

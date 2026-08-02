@@ -3,21 +3,77 @@ import SwiftUI
 
 @main
 struct EdgeNotedApp: App {
-    @State private var appState = AppState()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        WindowGroup {
-            ContentView()
-                .environment(appState)
-        }
-        .modelContainer(PersistenceController.container)
-        .commands {
-            SidebarCommands()
-        }
-
         Settings {
             SettingsView()
-                .environment(appState)
+                .environment(appDelegate.appState)
+                .environment(appDelegate.settings)
+                .modelContainer(PersistenceController.container)
         }
+    }
+}
+
+/// Builds the app services, decides between the live AppleScript bridge and
+/// the fake services (used by UI tests), and starts the panel coordinator.
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    let settings = SettingsStore()
+    private(set) var appState: AppState!
+    private var coordinator: ApplicationCoordinator?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        let useFakes = UserDefaults.standard.bool(forKey: "UITestFakeServices")
+        Log.info(
+            "Application did finish launching",
+            category: .lifecycle,
+            metadata: [
+                "services": useFakes ? "fake" : "applescript",
+                "version": "1.6",
+            ]
+        )
+
+        let notes: any NotesService
+        let reminders: any RemindersService
+
+        if useFakes {
+            let fakeNotes = FakeNotesService()
+            fakeNotes.seed(
+                id: "seed-1",
+                name: "Welcome to EdgeNoted",
+                body: "Edit this note - changes sync to Apple Notes.",
+                folderName: nil
+            )
+            fakeNotes.seed(
+                id: "seed-2",
+                name: "Shopping",
+                body: "- [ ] Milk\n- [x] Coffee\n- [ ] #E5484D hex colors render as swatches",
+                folderName: nil
+            )
+            let fakeReminders = FakeRemindersService()
+            fakeReminders.seed(name: "Call the dentist", listName: "Home")
+            fakeReminders.seed(name: "File expenses", listName: "Work")
+            notes = fakeNotes
+            reminders = fakeReminders
+        } else {
+            notes = AppleScriptNotesService()
+            reminders = AppleScriptRemindersService()
+        }
+
+        let appState = AppState(notes: notes, reminders: reminders, settings: settings)
+        self.appState = appState
+        let coordinator = ApplicationCoordinator(appState: appState, settings: settings)
+        self.coordinator = coordinator
+        coordinator.start()
+        Log.info("Coordinator started", category: .lifecycle)
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        Log.info("Application will terminate", category: .lifecycle)
+        coordinator?.stop()
+        // Flush buffered lines and close the handle. closeSynchronously runs
+        // off the main actor so termination never deadlocks on it.
+        Log.closeSynchronously()
     }
 }

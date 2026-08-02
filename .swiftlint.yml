@@ -12,12 +12,20 @@ opt_in_rules:
 disabled_rules:
   - line_length
   - todo
-
-# swift format (Apple's formatter) emits trailing commas in multiline
-# collections per SE-0383, so tell SwiftLint to require them too; otherwise
-# the formatter and linter fight each other on every commit.
-trailing_comma:
-  mandatory_comma: true
+  # App-style defaults: app code tends to have larger files, view functions,
+  # and settings initializers than library code, so these fire on noise.
+  - type_body_length
+  - file_length
+  - function_body_length
+  - cyclomatic_complexity
+  - function_parameter_count
+  # The bundled swift-format (Swift 6.x) enforces the opposite of these
+  # SwiftLint rules (opening brace on its own line for multi-line conditions,
+  # closure parameters on their own line, and no trailing commas). CI runs
+  # `swift format lint` first, so SwiftLint is aligned with the formatter.
+  - opening_brace
+  - closure_parameter_position
+  - trailing_comma
 
 analyzer_rules:
   - unused_import

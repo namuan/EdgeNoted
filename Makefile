@@ -21,8 +21,14 @@ test:
 build:
 	@bash Scripts/build-app.sh
 
+# Build the app bundle, then (re)launch it. Any running instance is asked to
+# quit first so the freshly built binary actually runs; the command fails if it
+# does not exit within ~5s instead of silently activating a stale build.
 run: build
-	@open "Build/EdgeNoted.app"
+	@pkill -TERM -x EdgeNoted 2>/dev/null || true; \
+	for i in $$(seq 1 50); do pgrep -x EdgeNoted >/dev/null || break; sleep 0.1; done; \
+	pgrep -x EdgeNoted >/dev/null && { echo "EdgeNoted did not quit in time" >&2; exit 1; }; \
+	open "Build/EdgeNoted.app"
 
 precommit: format lint analyze dead-code test
 

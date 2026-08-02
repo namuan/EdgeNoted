@@ -40,13 +40,17 @@ cat > "$APP_BUNDLE/Contents/Info.plist" <<EOF
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
+    <string>1.6</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>16</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>EdgeNoted reads and writes your Apple Notes and Reminders so they stay in sync with the edge panel.</string>
 </dict>
 </plist>
 EOF
@@ -65,6 +69,15 @@ if [ -d "$APP_NAME/Resources" ]; then
     rsync -a --exclude="Assets.xcassets" --exclude="*.entitlements" \
         "$APP_NAME/Resources/" "$APP_BUNDLE/Contents/Resources/" 2>/dev/null || true
 fi
+
+# Sign with entitlements (ad-hoc). A real developer identity can be used by
+# setting CODE_SIGN_IDENTITY in the environment; without it the TCC automation
+# permission may be re-requested after each rebuild.
+echo "==> Signing app bundle…"
+CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:--}"
+codesign --force --deep --sign "$CODE_SIGN_IDENTITY" \
+    --entitlements "$APP_NAME/Resources/EdgeNoted.entitlements" \
+    "$APP_BUNDLE"
 
 echo ""
 echo "App bundle created at: $APP_BUNDLE"
