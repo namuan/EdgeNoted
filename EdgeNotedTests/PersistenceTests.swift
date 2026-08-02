@@ -71,4 +71,49 @@ struct PersistenceTests {
         MetaStore.deleteSnippet(all[0], in: context)
         #expect(((try context.fetch(FetchDescriptor<Snippet>())) ?? []).isEmpty)
     }
+
+    @Test("Folder-name metadata keys migrate to real folder IDs")
+    func migrateFolderNameKeys() throws {
+        let context = makeContext()
+        // Legacy rows created before folder IDs were stored.
+        let legacy = NoteMeta(noteID: "legacy", folderID: "Concepts", isPinned: true)
+        context.insert(legacy)
+        let fresh = NoteMeta(noteID: "fresh", folderID: "f-1", isPinned: false)
+        context.insert(fresh)
+        // A stale name for a folder that no longer exists.
+        let stale = NoteMeta(noteID: "stale", folderID: "Gone Folder")
+        context.insert(stale)
+        try context.save()
+
+        let folders = [NotesFolder(id: "f-1", name: "Concepts")]
+        MetaStore.migrateFolderNameKeys(folders, in: context)
+
+        #expect(try MetaStore.noteMeta("legacy", in: context)?.folderID == "f-1")
+        #expect(try MetaStore.noteMeta("fresh", in: context)?.folderID == "f-1")
+        #expect(try MetaStore.noteMeta("stale", in: context)?.folderID == "")
+    }
+
+    @Test("Migration survives duplicate folder names and name/id collisions")
+    func migrateEdgeCases() throws {
+        let context = makeContext()
+        let byName = NoteMeta(noteID: "by-name", folderID: "Concepts")
+        context.insert(byName)
+        let byID = NoteMeta(noteID: "by-id", folderID: "f-2")
+        context.insert(byID)
+        try context.save()
+
+        // Two folders named "Concepts" (duplicate) and a folder whose name
+        // collides with another folder's real ID.
+        let folders = [
+            NotesFolder(id: "f-1", name: "Concepts"),
+            NotesFolder(id: "f-2", name: "Concepts"),
+            NotesFolder(id: "f-3", name: "f-2"),
+        ]
+        MetaStore.migrateFolderNameKeys(folders, in: context)
+
+        // Duplicate names: first wins.
+        #expect(try MetaStore.noteMeta("by-name", in: context)?.folderID == "f-1")
+        // A real ID that also equals a folder name must not be re-homed.
+        #expect(try MetaStore.noteMeta("by-id", in: context)?.folderID == "f-2")
+    }
 }

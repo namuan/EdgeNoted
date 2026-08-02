@@ -62,6 +62,21 @@ struct AppStateIntegrationTests {
         #expect(!harness.state.noteIsReadOnly)
     }
 
+    @Test("Local note metadata stores the folder ID, never the folder name")
+    func metadataStoresFolderID() async throws {
+        let harness = try await makeHarness()
+        await harness.state.startup()
+        harness.state.selectFolder("Work")
+        harness.state.selectNote("n1")
+        await waitForNoteOpen(harness.state)
+        harness.state.togglePin()
+        let context = harness.state.modelContainer.mainContext
+        let meta = try MetaStore.noteMeta("n1", in: context)
+        #expect(meta?.folderID == "f-work")  // real ID, not the "Work" name
+        #expect(meta?.folderID != "Work")
+        #expect(meta?.isPinned == true)
+    }
+
     @Test("Editing then saving writes back to the fake service")
     func editAndSave() async throws {
         let harness = try await makeHarness()

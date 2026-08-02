@@ -72,6 +72,11 @@ Backs up every Apple Notes note to a timestamped folder under
 - A `manifest.tsv` lists folder, name, id, and file path for every note.
 - It is **read-only on Apple Notes** — it only writes inside the backup folder.
 
+> **Local-only, sensitive.** This backup contains your complete Notes content
+> in plaintext. Never commit, upload, sync, or share it; the script refuses to
+> run inside the repository to prevent accidental commits. Delete old
+> `backup-*` folders when no longer needed.
+
 ## Common tasks
 
 Or step by step:

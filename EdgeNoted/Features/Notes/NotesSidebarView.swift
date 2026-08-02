@@ -161,28 +161,34 @@ struct NotesSidebarView: View {
         .buttonStyle(.plain)
         .contextMenu {
             Button(meta?.isPinned == true ? "Unpin" : "Pin") {
-                MetaStore.setNotePinned(
-                    meta?.isPinned != true,
-                    noteID: note.id,
-                    folderID: appState.selectedFolderName ?? "",
-                    in: modelContext
-                )
+                if let folderID = appState.resolvedFolderID {
+                    MetaStore.setNotePinned(
+                        meta?.isPinned != true,
+                        noteID: note.id,
+                        folderID: folderID,
+                        in: modelContext
+                    )
+                }
             }
             Button(meta?.isFolded == true ? "Expand Note" : "Fold Note") {
-                MetaStore.setNoteFolded(
-                    meta?.isFolded != true,
-                    noteID: note.id,
-                    folderID: appState.selectedFolderName ?? "",
-                    in: modelContext
-                )
+                if let folderID = appState.resolvedFolderID {
+                    MetaStore.setNoteFolded(
+                        meta?.isFolded != true,
+                        noteID: note.id,
+                        folderID: folderID,
+                        in: modelContext
+                    )
+                }
             }
             colorMenu(title: "Note Color") { hex in
-                MetaStore.setNoteColor(
-                    hex,
-                    noteID: note.id,
-                    folderID: appState.selectedFolderName ?? "",
-                    in: modelContext
-                )
+                if let folderID = appState.resolvedFolderID {
+                    MetaStore.setNoteColor(
+                        hex,
+                        noteID: note.id,
+                        folderID: folderID,
+                        in: modelContext
+                    )
+                }
             }
         }
     }

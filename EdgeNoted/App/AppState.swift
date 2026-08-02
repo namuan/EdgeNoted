@@ -239,6 +239,8 @@ final class AppState {
         do {
             let loadedFolders = try await notes.fetchFolders()
             folders = loadedFolders
+            // Re-home any local metadata that still uses folder names as keys.
+            MetaStore.migrateFolderNameKeys(loadedFolders, in: modelContainer.mainContext)
             let loaded = try await notes.fetchNotes(folderName: selectedFolderName)
             notesList = loaded
             if let selected = selectedNoteID, !loaded.contains(where: { $0.id == selected }) {
@@ -334,9 +336,22 @@ final class AppState {
 
     private func markOpened(_ detail: NoteDetail) {
         let context = modelContainer.mainContext
-        let meta = MetaStore.noteMeta(createIfNeededFor: detail.id, folderID: selectedFolderName ?? "", in: context)
+        // Folders are keyed by name in the AppleScript bridge, but local
+        // metadata must store the real folder ID, never the folder name.
+        guard let folderID = resolvedFolderID else { return }
+        let meta = MetaStore.noteMeta(createIfNeededFor: detail.id, folderID: folderID, in: context)
         meta.lastOpenedAt = Date()
         try? context.save()
+    }
+
+    /// The real Apple Notes folder ID for the currently selected folder.
+    /// - "All Notes" (no folder selected) maps to `""` (the All Notes bucket).
+    /// - nil when a folder is selected but not yet resolved from the loaded
+    ///   folder list (startup race) - callers must skip rather than write into
+    ///   the wrong bucket.
+    var resolvedFolderID: String? {
+        guard let selectedFolderName else { return "" }
+        return folders.first(where: { $0.name == selectedFolderName })?.id
     }
 
     // MARK: - Note editing
@@ -433,33 +448,33 @@ final class AppState {
     // MARK: - Local note metadata
 
     func togglePin() {
-        guard let selectedNoteID else { return }
+        guard let selectedNoteID, let folderID = resolvedFolderID else { return }
         let context = modelContainer.mainContext
         let meta = MetaStore.noteMeta(
             createIfNeededFor: selectedNoteID,
-            folderID: selectedFolderName ?? "",
+            folderID: folderID,
             in: context
         )
-        MetaStore.setNotePinned(!meta.isPinned, noteID: selectedNoteID, folderID: selectedFolderName ?? "", in: context)
+        MetaStore.setNotePinned(!meta.isPinned, noteID: selectedNoteID, folderID: folderID, in: context)
     }
 
     func toggleFold() {
-        guard let selectedNoteID else { return }
+        guard let selectedNoteID, let folderID = resolvedFolderID else { return }
         let context = modelContainer.mainContext
         let meta = MetaStore.noteMeta(
             createIfNeededFor: selectedNoteID,
-            folderID: selectedFolderName ?? "",
+            folderID: folderID,
             in: context
         )
-        MetaStore.setNoteFolded(!meta.isFolded, noteID: selectedNoteID, folderID: selectedFolderName ?? "", in: context)
+        MetaStore.setNoteFolded(!meta.isFolded, noteID: selectedNoteID, folderID: folderID, in: context)
     }
 
     func setNoteColor(_ hex: String?) {
-        guard let selectedNoteID else { return }
+        guard let selectedNoteID, let folderID = resolvedFolderID else { return }
         MetaStore.setNoteColor(
             hex,
             noteID: selectedNoteID,
-            folderID: selectedFolderName ?? "",
+            folderID: folderID,
             in: modelContainer.mainContext
         )
     }

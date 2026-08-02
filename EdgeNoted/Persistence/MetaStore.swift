@@ -27,6 +27,39 @@ enum MetaStore {
         return meta
     }
 
+    /// One-time migration for rows created before folder IDs were stored: rows
+    /// whose folderID is still a folder NAME are re-homed to the real folder
+    /// ID, and rows whose folderID is neither a known ID nor a known name are
+    /// re-homed to the "All Notes" bucket so no user-visible folder names are
+    /// retained. Idempotent and cheap after the first run.
+    static func migrateFolderNameKeys(_ folders: [NotesFolder], in context: ModelContext) {
+        guard !folders.isEmpty else { return }
+        // Duplicate folder names resolve to the first matching folder's ID.
+        let idByName = Dictionary(folders.map { ($0.name, $0.id) }, uniquingKeysWith: { first, _ in first })
+        let knownIDs = Set(folders.map(\.id))
+        let metas = (try? context.fetch(FetchDescriptor<NoteMeta>())) ?? []
+        var changed = false
+        for meta in metas {
+            let current = meta.folderID
+            if current.isEmpty { continue }
+            // A real folder ID always wins, even when it happens to equal a
+            // folder name.
+            if knownIDs.contains(current) { continue }
+            if let id = idByName[current] {
+                // Legacy name key -> real folder ID.
+                meta.folderID = id
+                changed = true
+            } else {
+                // Stale name for a deleted/nested folder -> All Notes bucket.
+                meta.folderID = ""
+                changed = true
+            }
+        }
+        if changed {
+            try? context.save()
+        }
+    }
+
     static func setNotePinned(_ pinned: Bool, noteID: String, folderID: String, in context: ModelContext) {
         let meta = noteMeta(createIfNeededFor: noteID, folderID: folderID, in: context)
         meta.isPinned = pinned

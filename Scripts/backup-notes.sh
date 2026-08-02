@@ -6,15 +6,52 @@ set -euo pipefail
 # is saved as its raw HTML body (the most faithful restore format) with a
 # manifest.tsv (folder, name, id, relative path) for restore/reference.
 #
-# Read-only on Apple Notes; only writes under the backup folder.
+# ⚠️  PRIVACY / LOCAL-ONLY
+# This backup contains your COMPLETE Apple Notes content in plaintext HTML,
+# including any sensitive, private, or confidential notes. Treat the output
+# folder like the Notes app itself:
+#   - It is strictly local. Never commit, upload, sync, or share it.
+#   - Do not place it inside a git repository (the script refuses to run there).
+#   - Delete old backup-* folders when they are no longer needed.
+# The script is read-only on Apple Notes; it only writes under the backup folder.
+#
 # Usage:  bash Scripts/backup-notes.sh   [optional: /path/to/backup/root]
 
 BACKUP_ROOT="${1:-$HOME/Documents/EdgeNoted Backup}"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-BACKUP_DIR="$BACKUP_ROOT/backup-$TIMESTAMP"
 
+# Canonicalize the repo and the would-be backup root, then refuse to write
+# inside the repository so a plaintext backup can never be committed by
+# accident. This runs BEFORE anything is created, and the canonical paths
+# prevent symlink-based bypasses.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+
+# Resolve the physical path of BACKUP_ROOT even when it does not exist yet:
+# canonicalize the nearest existing ancestor and append the remainder.
+PROBE="$BACKUP_ROOT"
+while [ ! -e "$PROBE" ] && [ "$PROBE" != "/" ]; do
+    PROBE="$(dirname "$PROBE")"
+done
+ANCESTOR_REAL="$(cd "$PROBE" && pwd -P)"
+REST="${BACKUP_ROOT#"$PROBE"}"
+RESOLVED_ROOT="$ANCESTOR_REAL$REST"
+
+case "$RESOLVED_ROOT" in
+    "$REPO_ROOT"|"$REPO_ROOT"/*)
+        echo "ERROR: refusing to back up inside the EdgeNoted repository ($RESOLVED_ROOT)." >&2
+        echo "       The backup contains full note content and must stay outside the repo." >&2
+        exit 1
+        ;;
+esac
+
+mkdir -p "$BACKUP_ROOT"
+BACKUP_DIR="$BACKUP_ROOT/backup-$TIMESTAMP"
 mkdir -p "$BACKUP_DIR"
-echo "Backing up Apple Notes to: $BACKUP_DIR"
+
+echo "Backing up Apple Notes to: $BACKUP_DIR" >&2
+echo "NOTE: this backup contains ALL of your note content in plaintext and is" >&2
+echo "      LOCAL ONLY - never commit, upload, or share it." >&2
 
 RESULT=$(osascript - "$BACKUP_DIR" <<'OSASCRIPT'
 on safeName(theName)
