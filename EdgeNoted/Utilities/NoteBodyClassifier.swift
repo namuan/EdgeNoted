@@ -39,19 +39,35 @@ enum NoteBodyClassifier {
     }
 
     /// The text shown in the editor: plain text as-is, and structural HTML
-    /// flattened (no visible content lost). Never applied to rich notes.
+    /// converted to plain text while preserving its line structure. Never
+    /// applied to rich notes.
     static func displayText(_ body: String) -> String {
         isPlainText(body) ? body : strippedForDisplay(body)
     }
 
     /// Strips HTML tags for display purposes only (never written back).
     static func strippedForDisplay(_ body: String) -> String {
+        guard let lineBreakRegex = try? NSRegularExpression(
+            pattern: #"<\s*br\s*/?\s*>|</\s*(?:div|p)\s*>"#,
+            options: [.caseInsensitive]
+        ) else {
+            return body
+        }
         guard let regex = try? NSRegularExpression(pattern: #"<[^>]+>"#, options: [.caseInsensitive]) else {
             return body
         }
         let textNS = body as NSString
         let range = NSRange(location: 0, length: textNS.length)
-        let cleaned = regex.stringByReplacingMatches(in: body, range: range, withTemplate: "")
+        let textWithLineBreaks = lineBreakRegex.stringByReplacingMatches(
+            in: body,
+            range: range,
+            withTemplate: "\n"
+        )
+        let cleaned = regex.stringByReplacingMatches(
+            in: textWithLineBreaks,
+            range: NSRange(location: 0, length: (textWithLineBreaks as NSString).length),
+            withTemplate: ""
+        )
         return
             cleaned
             .replacingOccurrences(of: "&amp;", with: "&")
@@ -60,5 +76,6 @@ enum NoteBodyClassifier {
             .replacingOccurrences(of: "&quot;", with: "\"")
             .replacingOccurrences(of: "&#39;", with: "'")
             .replacingOccurrences(of: "&nbsp;", with: " ")
+            .trimmingCharacters(in: .newlines)
     }
 }

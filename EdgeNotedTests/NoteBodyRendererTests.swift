@@ -59,13 +59,13 @@ struct NoteBodyClassifierTests {
         #expect(NoteBodyClassifier.isEditableAsPlainText("Just some text"))
     }
 
-    @Test("Structural HTML is editable and flattens without content loss")
+    @Test("Structural HTML is editable and preserves line breaks")
     func structuralHTML() {
         let body = "<div>Hello</div><div>world</div>"
         #expect(!NoteBodyClassifier.isPlainText(body))
         #expect(NoteBodyClassifier.isStructurallyPlain(body))
         #expect(NoteBodyClassifier.isEditableAsPlainText(body))
-        #expect(NoteBodyClassifier.displayText(body) == "Helloworld")
+        #expect(NoteBodyClassifier.displayText(body) == "Hello\nworld")
     }
 
     @Test("Rich content is read-only")
@@ -76,9 +76,9 @@ struct NoteBodyClassifierTests {
         #expect(!NoteBodyClassifier.isEditableAsPlainText("<ul><li>item</li></ul>"))
     }
 
-    @Test("Stripping removes tags and decodes entities")
+    @Test("Stripping preserves line breaks and decodes entities")
     func stripping() {
-        let stripped = NoteBodyClassifier.strippedForDisplay("<div>Hi &amp; bye<br></div>")
-        #expect(stripped == "Hi & bye")
+        let stripped = NoteBodyClassifier.strippedForDisplay("<div>Hi &amp; bye<br>there</div>")
+        #expect(stripped == "Hi & bye\nthere")
     }
 }
