@@ -1,96 +1,25 @@
 import SwiftUI
 
-/// Reminders: list sidebar, quick capture, and the selected list's items.
+/// Reminders: a unified view of incomplete overdue and today items.
 struct RemindersSectionView: View {
     @Environment(AppState.self) private var appState
-    @Environment(SettingsStore.self) private var settings
 
     var body: some View {
-        @Bindable var appState = appState
-        HStack(spacing: 0) {
-            listSidebar
-            Rectangle()
-                .fill(.secondary.opacity(0.2))
-                .frame(width: 1)
-            content(appState: appState)
-        }
-    }
-
-    private var listSidebar: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 1) {
-                ForEach(appState.reminderLists) { list in
-                    listRow(list)
-                }
-            }
-            .padding(.vertical, 4)
-        }
-        .frame(width: 170)
-    }
-
-    private func listRow(_ list: ReminderList) -> some View {
-        let selected = appState.selectedListName == list.name
-        return Button {
-            appState.selectReminderList(list.name)
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "list.bullet")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(list.name)
-                    .lineLimit(1)
-                    .font(.callout)
-                Spacer(minLength: 0)
-            }
-            .padding(.vertical, 3)
-            .padding(.horizontal, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                selected ? settings.activeTheme().accentColor.opacity(0.18) : Color.clear,
-                in: RoundedRectangle(cornerRadius: 5)
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func content(appState: AppState) -> some View {
-        VStack(spacing: 0) {
-            quickCapture(appState: appState)
-            Rectangle()
-                .fill(.secondary.opacity(0.2))
-                .frame(height: 1)
-            reminderList
-        }
-    }
-
-    private func quickCapture(appState: AppState) -> some View {
-        @Bindable var appState = appState
-        return HStack(spacing: 6) {
-            Image(systemName: "plus.circle")
-                .foregroundStyle(settings.activeTheme().accentColor)
-            TextField("Add reminder…", text: $appState.quickCaptureText)
-                .textFieldStyle(.plain)
-                .onSubmit {
-                    appState.quickCapture()
-                }
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        reminderList
     }
 
     @ViewBuilder
     private var reminderList: some View {
-        if appState.reminderItems.isEmpty {
+        if appState.displayedReminderItems.isEmpty {
             ContentUnavailableView(
-                "No reminders",
+                "No reminders due",
                 systemImage: "checklist",
-                description: Text("Use the field above to capture a reminder.")
+                description: Text("No incomplete reminders are overdue or due today in any list.")
             )
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 1) {
-                    ForEach(appState.reminderItems) { item in
+                    ForEach(appState.displayedReminderItems) { item in
                         ReminderRow(item: item)
                     }
                 }
@@ -140,6 +69,11 @@ private struct ReminderRow: View {
                         )
                         .font(.caption2)
                         .foregroundStyle(isOverdue(dueEpoch) ? .red : theme.secondaryColor)
+                    }
+                    if !item.listName.isEmpty {
+                        Label(item.listName, systemImage: "list.bullet")
+                            .font(.caption2)
+                            .foregroundStyle(theme.secondaryColor)
                     }
                     if item.priorityLevel != .none {
                         Text(item.priorityLevel.title)
@@ -222,7 +156,7 @@ private struct ReminderRow: View {
     }
 
     private func isOverdue(_ dueEpoch: TimeInterval) -> Bool {
-        dueEpoch < Date().timeIntervalSince1970 && !item.isCompleted
+        dueEpoch < Calendar.current.startOfDay(for: .now).timeIntervalSince1970 && !item.isCompleted
     }
 
     private static var startOfToday: TimeInterval {

@@ -15,6 +15,7 @@ struct AppStateIntegrationTests {
     private struct Harness {
         let state: AppState
         let notes: FakeNotesService
+        let reminders: FakeRemindersService
     }
 
     private func makeHarness() async throws -> Harness {
@@ -34,7 +35,7 @@ struct AppStateIntegrationTests {
         settings.configuredNoteFolderName = "Work"
         settings.configuredNoteName = "Meeting"
         let state = AppState(notes: notes, reminders: reminders, settings: settings, modelContainer: container)
-        return Harness(state: state, notes: notes)
+        return Harness(state: state, notes: notes, reminders: reminders)
     }
 
     @Test("Startup loads folders and reminder lists")
@@ -231,28 +232,109 @@ struct AppStateIntegrationTests {
         }
     }
 
-    @Test("Reminder quick capture creates an item in the selected list")
-    func quickCapture() async throws {
+    @Test("Reminder display includes only incomplete overdue and today items")
+    func displayedReminders() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))
+        let referenceDate = try #require(
+            calendar.date(from: DateComponents(year: 2026, month: 8, day: 3, hour: 12))
+        )
+        let startOfTomorrow = try #require(
+            calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: referenceDate))
+        )
+
+        let overdue = ReminderItem(
+            id: "overdue",
+            name: "Overdue",
+            isCompleted: false,
+            dueEpoch: referenceDate.addingTimeInterval(-86_400).timeIntervalSince1970,
+            priority: 0
+        )
+        let today = ReminderItem(
+            id: "today",
+            name: "Today",
+            isCompleted: false,
+            dueEpoch: calendar.startOfDay(for: referenceDate).timeIntervalSince1970,
+            priority: 0
+        )
+        let tomorrow = ReminderItem(
+            id: "tomorrow",
+            name: "Tomorrow",
+            isCompleted: false,
+            dueEpoch: startOfTomorrow.timeIntervalSince1970,
+            priority: 0
+        )
+        let completed = ReminderItem(
+            id: "completed",
+            name: "Completed",
+            isCompleted: true,
+            dueEpoch: overdue.dueEpoch,
+            priority: 0
+        )
+        let unscheduled = ReminderItem(
+            id: "unscheduled",
+            name: "Unscheduled",
+            isCompleted: false,
+            dueEpoch: nil,
+            priority: 0
+        )
+
+        #expect(overdue.isDueTodayOrOverdue(referenceDate: referenceDate, calendar: calendar))
+        #expect(today.isDueTodayOrOverdue(referenceDate: referenceDate, calendar: calendar))
+        #expect(!tomorrow.isDueTodayOrOverdue(referenceDate: referenceDate, calendar: calendar))
+        #expect(!completed.isDueTodayOrOverdue(referenceDate: referenceDate, calendar: calendar))
+        #expect(!unscheduled.isDueTodayOrOverdue(referenceDate: referenceDate, calendar: calendar))
+    }
+
+    @Test("Unified reminder view loads due reminders from every list")
+    func unifiedReminderView() async throws {
         let harness = try await makeHarness()
-        await harness.state.startup()
-        harness.state.selectedListName = "Work"
-        harness.state.quickCaptureText = "Ship the panel"
-        harness.state.quickCapture()
-        #expect(harness.state.quickCaptureText.isEmpty)
-        for _ in 0..<2_000 {
-            if harness.state.reminderItems.contains(where: { $0.name == "Ship the panel" }) {
-                break
-            }
-            await Task.yield()
+        await harness.reminders.seed(name: "Work task", listName: "Work")
+        await harness.reminders.seed(name: "Home task", listName: "Home")
+        let dueEpoch = Date().addingTimeInterval(-86_400).timeIntervalSince1970
+
+        for listName in ["Work", "Home"] {
+            let all = try await harness.reminders.fetchAllReminders()
+            let item = try #require(all.first { $0.listName == listName })
+            try await harness.reminders.updateReminder(
+                id: item.id,
+                title: nil,
+                isCompleted: nil,
+                dueEpoch: dueEpoch,
+                priority: nil
+            )
         }
-        #expect(harness.state.reminderItems.contains { $0.name == "Ship the panel" })
+
+        await harness.state.startup()
+
+        #expect(Set(harness.state.reminderItems.map(\.listName)) == Set(["Work", "Home"]))
+        #expect(Set(harness.state.displayedReminderItems.map(\.listName)) == Set(["Work", "Home"]))
+    }
+
+    @Test("Showing the panel again refreshes newly overdue reminders")
+    func refreshesNewlyOverdueReminders() async throws {
+        let harness = try await makeHarness()
+        await harness.reminders.seed(name: "File report", listName: "Work")
+        await harness.state.startup()
+        let item = try #require(harness.state.reminderItems.first)
+
+        try await harness.reminders.updateReminder(
+            id: item.id,
+            title: nil,
+            isCompleted: nil,
+            dueEpoch: Date().addingTimeInterval(-86_400).timeIntervalSince1970,
+            priority: nil
+        )
+        await harness.state.refreshReminders()
+
+        #expect(harness.state.displayedReminderItems.map(\.id) == [item.id])
     }
 
     @Test("Clearing a reminder due date removes it through the bridge contract")
     func clearReminderDueDate() async throws {
         let reminders = FakeRemindersService()
         await reminders.seed(name: "Task", listName: "Work")
-        let items = try await reminders.fetchReminders(listName: "Work")
+        let items = try await reminders.fetchAllReminders()
         let item = try #require(items.first)
         try await reminders.updateReminder(
             id: item.id,
@@ -261,7 +343,7 @@ struct AppStateIntegrationTests {
             dueEpoch: 1_700_000_000,
             priority: nil
         )
-        let withDue = try await reminders.fetchReminders(listName: "Work")
+        let withDue = try await reminders.fetchAllReminders()
         #expect(withDue.first?.dueEpoch == 1_700_000_000)
         try await reminders.updateReminder(
             id: item.id,
@@ -271,7 +353,7 @@ struct AppStateIntegrationTests {
             priority: nil,
             clearDueDate: true
         )
-        let cleared = try await reminders.fetchReminders(listName: "Work")
+        let cleared = try await reminders.fetchAllReminders()
         #expect(cleared.first?.dueEpoch == nil)
     }
 }

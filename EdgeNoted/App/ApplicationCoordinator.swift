@@ -76,7 +76,12 @@ final class ApplicationCoordinator {
         panelController.show()
         // First show triggers the initial load, so the Notes/Reminders
         // permission prompt appears in context (just in time), never at launch.
-        Task { await appState.ensureStarted() }
+        // Every subsequent show reloads the selected Reminders list so changes
+        // made in Apple Reminders, including newly overdue items, are visible.
+        Task {
+            await appState.ensureStarted()
+            await appState.refreshReminders()
+        }
     }
 
     func hidePanel() {

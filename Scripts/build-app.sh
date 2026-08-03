@@ -50,7 +50,9 @@ cat > "$APP_BUNDLE/Contents/Info.plist" <<EOF
     <key>LSUIElement</key>
     <true/>
     <key>NSAppleEventsUsageDescription</key>
-    <string>EdgeNoted reads and writes your Apple Notes and Reminders so they stay in sync with the edge panel.</string>
+    <string>EdgeNoted reads and writes your Apple Notes so they stay in sync with the edge panel.</string>
+    <key>NSRemindersFullAccessUsageDescription</key>
+    <string>EdgeNoted needs access to your reminders to show and manage due tasks.</string>
 </dict>
 </plist>
 EOF

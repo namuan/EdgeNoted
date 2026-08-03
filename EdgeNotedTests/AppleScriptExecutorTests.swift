@@ -35,4 +35,18 @@ struct AppleScriptExecutorTests {
         let elapsed = Date().timeIntervalSince(started)
         #expect(elapsed < 10)
     }
+
+    @Test("Notes commands remain and Reminders commands were removed")
+    func reminderCommandsRemoved() {
+        let script = AppleScriptExecutor.script
+
+        #expect(script.contains("else if cmd is \"notes\""))
+        #expect(script.contains("else if cmd is \"note\""))
+        #expect(!script.contains("command=reminders"))
+        #expect(!script.contains("cmd is \"lists\""))
+        #expect(!script.contains("cmd is \"reminders\""))
+        #expect(!script.contains("cmd is \"reminder-create\""))
+        #expect(!script.contains("cmd is \"reminder-update\""))
+        #expect(!script.contains("cmd is \"reminder-delete\""))
+    }
 }

@@ -12,12 +12,12 @@ enum ScriptError: LocalizedError, Equatable {
         switch self {
         case .timedOut:
             return
-                "Timed out talking to Apple Notes or Reminders. If this is the first launch, approve EdgeNoted in System Settings > Privacy & Security > Automation and try again."
+                "Timed out talking to Apple Notes. If this is the first launch, approve EdgeNoted in System Settings > Privacy & Security > Automation and try again."
         case .permissionDenied:
             return
-                "EdgeNoted is not allowed to control Apple Notes or Reminders. Grant access in System Settings > Privacy & Security > Automation, then try again."
+                "EdgeNoted is not allowed to control Apple Notes. Grant access in System Settings > Privacy & Security > Automation, then try again."
         case .appNotRunning(let message):
-            return "Apple Notes or Reminders is unavailable: \(message)"
+            return "Apple Notes is unavailable: \(message)"
         case .executionFailed(let message):
             return "AppleScript error: \(message)"
         case .malformedOutput(let message):
@@ -151,82 +151,6 @@ actor AppleScriptExecutor {
                         set theNote to first note whose id is noteID
                         set name of theNote to theName
                         set body of theNote to theBody
-                        return "OK"
-                    on error errMsg
-                        return "ERR:" & errMsg
-                    end try
-                end tell
-            else if cmd is "lists" then
-                tell application "Reminders"
-                    set outList to {}
-                    repeat with l in lists
-                        try
-                            set end of outList to {idStr:(id of l), nameStr:(name of l)}
-                        end try
-                    end repeat
-                    return my jsonFromObject(outList)
-                end tell
-            else if cmd is "reminders" then
-                set listName to item 2 of argv
-                tell application "Reminders"
-                    set outList to {}
-                    try
-                        repeat with r in (every reminder of list listName)
-                            set dueStr to ""
-                            set priStr to ""
-                            try
-                                set d to due date of r
-                                set dueStr to (my epochOf(d)) as text
-                            end try
-                            try
-                                set priStr to (priority of r) as text
-                            end try
-                            set end of outList to {idStr:(id of r), nameStr:(name of r), doneStr:((completed of r) as text), dueStr:dueStr, priStr:priStr}
-                        end repeat
-                    end try
-                    return my jsonFromObject(outList)
-                end tell
-            else if cmd is "reminder-create" then
-                set listName to item 2 of argv
-                set theName to item 3 of argv
-                tell application "Reminders"
-                    try
-                        set theList to first list whose name is listName
-                        set theNew to make new reminder at end of theList with properties {name:theName}
-                        return my jsonFromObject({idStr:(id of theNew), nameStr:theName})
-                    on error errMsg
-                        return my jsonFromObject({errorStr:errMsg})
-                    end try
-                end tell
-            else if cmd is "reminder-update" then
-                set remID to item 2 of argv
-                set theName to item 3 of argv
-                set doneFlag to item 4 of argv
-                set dueEpoch to item 5 of argv
-                set priLevel to item 6 of argv
-                tell application "Reminders"
-                    try
-                        set theR to first reminder whose id is remID
-                        if theName is not "" then set name of theR to theName
-                        if doneFlag is not "" then set completed of theR to (doneFlag is "1")
-                    if priLevel is not "" then set priority of theR to (priLevel as integer)
-                    if dueEpoch is "clear" then
-                        set due date of theR to missing value
-                    else if dueEpoch is not "" then
-                        set dueDate to current application's NSDate's dateWithTimeIntervalSince1970:(dueEpoch as real)
-                        set due date of theR to dueDate
-                    end if
-                        return "OK"
-                    on error errMsg
-                        return "ERR:" & errMsg
-                    end try
-                end tell
-            else if cmd is "reminder-delete" then
-                set remID to item 2 of argv
-                tell application "Reminders"
-                    try
-                        set theR to first reminder whose id is remID
-                        delete theR
                         return "OK"
                     on error errMsg
                         return "ERR:" & errMsg

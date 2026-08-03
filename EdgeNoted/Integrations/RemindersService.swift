@@ -32,9 +32,21 @@ struct ReminderItem: Identifiable, Hashable, Sendable {
     var isCompleted: Bool
     var dueEpoch: TimeInterval?
     var priority: Int
+    var listName: String = ""
 
     var priorityLevel: ReminderPriority {
         ReminderPriority(rawValue: priority) ?? .none
+    }
+
+    /// Whether this incomplete reminder belongs in the overdue-and-today panel.
+    func isDueTodayOrOverdue(referenceDate: Date = .now, calendar: Calendar = .current) -> Bool {
+        guard !isCompleted, let dueEpoch else { return false }
+        guard let startOfTomorrow = calendar.date(
+            byAdding: .day,
+            value: 1,
+            to: calendar.startOfDay(for: referenceDate)
+        ) else { return false }
+        return Date(timeIntervalSince1970: dueEpoch) < startOfTomorrow
     }
 }
 
@@ -43,8 +55,7 @@ struct ReminderItem: Identifiable, Hashable, Sendable {
 /// Bridge to Apple Reminders. Implementations must be Sendable.
 protocol RemindersService: Sendable {
     func fetchLists() async throws -> [ReminderList]
-    func fetchReminders(listName: String) async throws -> [ReminderItem]
-    func createReminder(title: String, listName: String) async throws -> ReminderItem
+    func fetchAllReminders() async throws -> [ReminderItem]
     func updateReminder(
         id: String,
         title: String?,
@@ -56,139 +67,30 @@ protocol RemindersService: Sendable {
     func deleteReminder(id: String) async throws
 }
 
-// MARK: - AppleScript implementation
+/// Optional capability for services that can observe external Reminders
+/// changes. AppState subscribes when the concrete service supports it.
+protocol RemindersChangeObserving: AnyObject {
+    func setChangeHandler(_ handler: (@Sendable () -> Void)?) async
+}
 
-/// RemindersService backed by the Apple Reminders AppleScript dictionary.
-final class AppleScriptRemindersService: RemindersService, @unchecked Sendable {
-    private let executor: AppleScriptExecutor
+/// Errors surfaced by the EventKit-backed Reminders service. Kept separate
+/// from ScriptError so the UI can distinguish automation failures (Notes) from
+/// calendar-access failures (Reminders).
+enum RemindersAccessError: LocalizedError, Equatable {
+    case accessDenied
+    case accessRestricted
+    case writeOnly
 
-    init(executor: AppleScriptExecutor = .shared) {
-        self.executor = executor
-    }
-
-    func fetchLists() async throws -> [ReminderList] {
-        try await logged("fetchLists") {
-            let output = try await executor.run(command: "lists")
-            let entries = try decode([ListEntry].self, from: output)
-            return entries.map { ReminderList(id: $0.idStr, name: $0.nameStr) }
+    var errorDescription: String? {
+        switch self {
+        case .accessDenied:
+            return
+                "EdgeNoted is not allowed to access your Reminders. Grant access in System Settings > Privacy & Security > Reminders, then try again."
+        case .accessRestricted:
+            return "Reminders access is restricted on this Mac (parental controls or MDM)."
+        case .writeOnly:
+            return "Reminders access is limited to adding events. Full access is required to display reminders."
         }
-    }
-
-    func fetchReminders(listName: String) async throws -> [ReminderItem] {
-        try await logged("fetchReminders", reminderID: Log.digest(listName)) {
-            let output = try await executor.run(command: "reminders", arguments: [listName])
-            let entries = try decode([ReminderEntry].self, from: output)
-            return entries.map { entry in
-                ReminderItem(
-                    id: entry.idStr,
-                    name: entry.nameStr,
-                    isCompleted: entry.doneStr == "true",
-                    dueEpoch: Double(entry.dueStr).flatMap { $0 > 0 ? $0 : nil },
-                    priority: Int(entry.priStr) ?? 0
-                )
-            }
-        }
-    }
-
-    func createReminder(title: String, listName: String) async throws -> ReminderItem {
-        try await logged("createReminder", reminderID: Log.digest(listName)) {
-            let output = try await executor.run(command: "reminder-create", arguments: [listName, title])
-            let entry = try decode(ReminderEntry.self, from: output)
-            if let error = entry.errorStr {
-                throw ScriptError.executionFailed(error)
-            }
-            return ReminderItem(id: entry.idStr, name: entry.nameStr, isCompleted: false, dueEpoch: nil, priority: 0)
-        }
-    }
-
-    func updateReminder(
-        id: String,
-        title: String?,
-        isCompleted: Bool?,
-        dueEpoch: TimeInterval?,
-        priority: Int?,
-        clearDueDate: Bool = false
-    ) async throws {
-        try await logged("updateReminder", reminderID: id) {
-            let titleArg = title ?? ""
-            let doneArg = isCompleted.map { $0 ? "1" : "0" } ?? ""
-            let dueArg: String
-            if clearDueDate {
-                dueArg = "clear"
-            } else {
-                dueArg = dueEpoch.map { String(Int($0)) } ?? ""
-            }
-            let priorityArg = priority.map { String($0) } ?? ""
-            let output = try await executor.run(
-                command: "reminder-update",
-                arguments: [id, titleArg, doneArg, dueArg, priorityArg]
-            )
-            guard output.hasPrefix("OK") else {
-                throw ScriptError.executionFailed(output)
-            }
-        }
-    }
-
-    func deleteReminder(id: String) async throws {
-        try await logged("deleteReminder", reminderID: id) {
-            let output = try await executor.run(command: "reminder-delete", arguments: [id])
-            guard output.hasPrefix("OK") else {
-                throw ScriptError.executionFailed(output)
-            }
-        }
-    }
-
-    private func logged<T>(_ operation: String, reminderID: String? = nil, _ body: () async throws -> T) async throws
-        -> T
-    {
-        let startedAt = Date()
-        do {
-            let result = try await body()
-            Log.info(
-                "Reminders \(operation) ok",
-                category: .reminders,
-                metadata: [
-                    "reminderId": reminderID ?? "-",
-                    "elapsedMs": String(Int(Date().timeIntervalSince(startedAt) * 1000)),
-                ]
-            )
-            return result
-        } catch {
-            Log.error(
-                "Reminders \(operation) failed",
-                category: .reminders,
-                metadata: [
-                    "reminderId": reminderID ?? "-",
-                    "elapsedMs": String(Int(Date().timeIntervalSince(startedAt) * 1000)),
-                ]
-            )
-            throw error
-        }
-    }
-
-    private func decode<T: Decodable>(_ type: T.Type, from output: String) throws -> T {
-        guard let data = output.data(using: .utf8) else {
-            throw ScriptError.malformedOutput(output)
-        }
-        do {
-            return try JSONDecoder().decode(T.self, from: data)
-        } catch {
-            throw ScriptError.malformedOutput(output)
-        }
-    }
-
-    private struct ListEntry: Decodable {
-        let idStr: String
-        let nameStr: String
-    }
-
-    private struct ReminderEntry: Decodable {
-        let idStr: String
-        let nameStr: String
-        let doneStr: String
-        let dueStr: String
-        let priStr: String
-        let errorStr: String?
     }
 }
 
@@ -225,24 +127,19 @@ actor FakeRemindersService: RemindersService {
         lists
     }
 
-    func fetchReminders(listName: String) async throws -> [ReminderItem] {
-        store[listName]?
-            .map {
+    func fetchAllReminders() async throws -> [ReminderItem] {
+        lists.flatMap { list in
+            store[list.name]?.map {
                 ReminderItem(
                     id: $0.key,
                     name: $0.value.name,
                     isCompleted: $0.value.isCompleted,
                     dueEpoch: $0.value.dueEpoch,
-                    priority: $0.value.priority
+                    priority: $0.value.priority,
+                    listName: list.name
                 )
-            }
-            ?? []
-    }
-
-    func createReminder(title: String, listName: String) async throws -> ReminderItem {
-        let id = "fake-reminder-\(abs(title.hashValue))"
-        store[listName]?[id] = StoredReminder(name: title, isCompleted: false, dueEpoch: nil, priority: 0)
-        return ReminderItem(id: id, name: title, isCompleted: false, dueEpoch: nil, priority: 0)
+            } ?? []
+        }
     }
 
     func updateReminder(

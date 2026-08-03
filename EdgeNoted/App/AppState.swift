@@ -63,15 +63,17 @@ final class AppState {
     // MARK: Reminders
 
     var reminderLists: [ReminderList] = []
-    var selectedListName: String?
     var reminderItems: [ReminderItem] = []
-    var selectedReminderID: String?
-    var quickCaptureText = ""
+
+    var displayedReminderItems: [ReminderItem] {
+        reminderItems.filter { $0.isDueTodayOrOverdue() }
+    }
 
     // MARK: Private state
 
     private var sync = NoteDraftSync()
     private var pollTask: Task<Void, Never>?
+    private var reminderReloadTask: Task<Void, Never>?
     private var saveDebouncer: Debouncer?
     private var lastRemoteMtime: TimeInterval?
     /// The note id with unsaved edits, so a pending save survives switching
@@ -147,14 +149,10 @@ final class AppState {
             await loadConfiguredNote()
             let loadedReminderLists = try await loadedLists
             reminderLists = loadedReminderLists
-            if selectedListName == nil {
-                selectedListName = loadedReminderLists.first?.name
-            }
             // Re-home any local metadata that still uses folder names as keys.
             MetaStore.migrateFolderNameKeys(loadedFolders, in: modelContainer.mainContext)
-            if let selectedListName {
-                await loadReminders(listName: selectedListName)
-            }
+            await loadAllReminders()
+            await subscribeToReminderChanges()
             statusMessage = nil
             automationNeedsAppLaunch = false
             Log.info(
@@ -213,18 +211,14 @@ final class AppState {
     }
 
     private func launchAutomationApps() {
-        for bundleIdentifier in ["com.apple.Notes", "com.apple.Reminders"] {
-            guard
-                let applicationURL = NSWorkspace.shared.urlForApplication(
-                    withBundleIdentifier: bundleIdentifier
-                )
-            else {
-                continue
-            }
-            let configuration = NSWorkspace.OpenConfiguration()
-            configuration.activates = false
-            NSWorkspace.shared.openApplication(at: applicationURL, configuration: configuration) { _, _ in }
+        guard
+            let applicationURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Notes")
+        else {
+            return
         }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = false
+        NSWorkspace.shared.openApplication(at: applicationURL, configuration: configuration) { _, _ in }
     }
 
     // MARK: - Displayed note
@@ -531,28 +525,115 @@ final class AppState {
 
     // MARK: - Reminders
 
-    func selectReminderList(_ name: String?) {
-        guard selectedListName != name else { return }
-        selectedListName = name
-        reminderItems = []
-        selectedReminderID = nil
-        guard let name else { return }
-        Task { await loadReminders(listName: name) }
+    func refreshReminders() async {
+        Log.info("All-reminder refresh requested", category: .reminders)
+        await loadAllReminders()
     }
 
-    func loadReminders(listName: String) async {
+    /// Registers for external Reminders changes when the service supports it.
+    /// External edits (including new due dates) refresh the panel automatically.
+    private func subscribeToReminderChanges() async {
+        guard let observing = reminders as? any RemindersChangeObserving else { return }
+        await observing.setChangeHandler { [weak self] in
+            Task { @MainActor in
+                self?.scheduleReminderReload()
+            }
+        }
+    }
+
+    /// Coalesces bursts of EKEventStoreChanged notifications into one reload.
+    private func scheduleReminderReload() {
+        reminderReloadTask?.cancel()
+        reminderReloadTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            await self?.reloadRemindersFromExternalChange()
+        }
+    }
+
+    /// Refreshes lists and items after an external change; a list may have been
+    /// added, renamed, or removed, so the list set is reloaded too.
+    private func reloadRemindersFromExternalChange() async {
         do {
-            reminderItems = try await reminders.fetchReminders(listName: listName)
+            reminderLists = try await reminders.fetchLists()
+            await loadAllReminders()
+        } catch {
+            handleServiceError(error)
+        }
+    }
+
+    func loadAllReminders() async {
+        do {
+            reminderItems = try await reminders.fetchAllReminders()
+            logReminderVisibility()
             Log.info(
-                "Reminders loaded",
+                "All reminders loaded",
                 category: .reminders,
                 metadata: [
-                    "listId": Log.digest(listName),
                     "count": String(reminderItems.count),
+                    "listCount": String(reminderLists.count),
                 ]
             )
         } catch {
             handleServiceError(error)
+        }
+    }
+
+    /// Records the bridge data and local filter decision without reminder names.
+    private func logReminderVisibility() {
+        let referenceDate = Date()
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: referenceDate)
+        guard let startOfTomorrow = calendar.date(byAdding: .day, value: 1, to: startOfToday) else {
+            Log.error("Reminder visibility evaluation failed", category: .reminders)
+            return
+        }
+
+        let visibleItems = reminderItems.filter {
+            $0.isDueTodayOrOverdue(referenceDate: referenceDate, calendar: calendar)
+        }
+        let completedCount = reminderItems.filter(\.isCompleted).count
+        let missingDueDateCount = reminderItems.filter { $0.dueEpoch == nil }.count
+        let futureCount = reminderItems.filter {
+            guard !($0.isCompleted), let dueEpoch = $0.dueEpoch else { return false }
+            return dueEpoch >= startOfTomorrow.timeIntervalSince1970
+        }.count
+
+        Log.info(
+            "Reminder visibility evaluated",
+            category: .reminders,
+            metadata: [
+                "completed": String(completedCount),
+                "dueMissing": String(missingDueDateCount),
+                "future": String(futureCount),
+                "startOfToday": String(Int(startOfToday.timeIntervalSince1970)),
+                "startOfTomorrow": String(Int(startOfTomorrow.timeIntervalSince1970)),
+                "total": String(reminderItems.count),
+                "visible": String(visibleItems.count),
+            ]
+        )
+
+        guard !reminderItems.isEmpty, visibleItems.isEmpty else { return }
+        for item in reminderItems {
+            let filterReason: String
+            if item.isCompleted {
+                filterReason = "completed"
+            } else if item.dueEpoch == nil {
+                filterReason = "dueMissing"
+            } else if let dueEpoch = item.dueEpoch, dueEpoch >= startOfTomorrow.timeIntervalSince1970 {
+                filterReason = "future"
+            } else {
+                filterReason = "unknown"
+            }
+            Log.warning(
+                "Reminder filtered from panel",
+                category: .reminders,
+                metadata: [
+                    "dueEpoch": item.dueEpoch.map { String(Int($0)) } ?? "-",
+                    "reason": filterReason,
+                    "reminderId": Log.digest(item.id),
+                ]
+            )
         }
     }
 
@@ -564,7 +645,8 @@ final class AppState {
             name: item.name,
             isCompleted: completed,
             dueEpoch: item.dueEpoch,
-            priority: item.priority
+            priority: item.priority,
+            listName: item.listName
         )
         Log.info(
             "Reminder completion toggled",
@@ -586,29 +668,7 @@ final class AppState {
                 )
             } catch {
                 handleServiceError(error)
-                if let selectedListName {
-                    await loadReminders(listName: selectedListName)
-                }
-            }
-        }
-    }
-
-    func quickCapture() {
-        let text = quickCaptureText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, let listName = selectedListName else { return }
-        quickCaptureText = ""
-        Log.info("Reminder quick capture", category: .reminders, metadata: ["listId": Log.digest(listName)])
-        Task {
-            do {
-                let created = try await reminders.createReminder(title: text, listName: listName)
-                reminderItems.insert(created, at: 0)
-            } catch {
-                handleServiceError(error)
-                Log.error(
-                    "Reminder quick capture failed",
-                    category: .reminders,
-                    metadata: ["listId": Log.digest(listName)]
-                )
+                await refreshReminders()
             }
         }
     }
@@ -621,7 +681,8 @@ final class AppState {
             name: trimmed.isEmpty ? item.name : trimmed,
             isCompleted: item.isCompleted,
             dueEpoch: item.dueEpoch,
-            priority: item.priority
+            priority: item.priority,
+            listName: item.listName
         )
         guard !trimmed.isEmpty else { return }
         Log.info("Reminder renamed", category: .reminders, metadata: ["reminderId": item.id])
@@ -648,7 +709,8 @@ final class AppState {
             name: item.name,
             isCompleted: item.isCompleted,
             dueEpoch: dueEpoch,
-            priority: priority
+            priority: priority,
+            listName: item.listName
         )
         Log.info(
             "Reminder details updated",
@@ -681,7 +743,8 @@ final class AppState {
             name: item.name,
             isCompleted: item.isCompleted,
             dueEpoch: nil,
-            priority: item.priority
+            priority: item.priority,
+            listName: item.listName
         )
         Log.info("Reminder due date cleared", category: .reminders, metadata: ["reminderId": item.id])
         Task {
@@ -721,6 +784,20 @@ final class AppState {
     // MARK: - Error handling
 
     private func handleServiceError(_ error: Error) {
+        if let accessError = error as? RemindersAccessError {
+            // Calendar-access failures use the same recoverable banner flow as
+            // automation permission, with Reminders-specific guidance.
+            automationDenied = true
+            automationNeedsAppLaunch = false
+            automationError = accessError.errorDescription
+            statusMessage = nil
+            Log.error(
+                "Reminders access error",
+                category: .reminders,
+                metadata: ["kind": String(describing: accessError)]
+            )
+            return
+        }
         if let scriptError = error as? ScriptError {
             // Log only the classified kind, never the raw AppleScript message,
             // which can echo back user content.

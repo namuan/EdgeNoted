@@ -29,7 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             "Application did finish launching",
             category: .lifecycle,
             metadata: [
-                "services": useFakes ? "fake" : "applescript",
+                "services": useFakes ? "fake" : "eventkit",
                 "version": "1.6",
             ]
         )
@@ -58,7 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             reminders = fakeReminders
         } else {
             notes = AppleScriptNotesService()
-            reminders = AppleScriptRemindersService()
+            reminders = EventKitRemindersService()
         }
 
         let appState = AppState(notes: notes, reminders: reminders, settings: settings)
