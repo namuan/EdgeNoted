@@ -32,22 +32,6 @@ final class NoteMeta {
     }
 }
 
-/// Local-only metadata for a Notes folder.
-@Model
-final class FolderMeta {
-    @Attribute(.unique) var folderID: String
-    var isPinned: Bool
-    var orderIndex: Int
-    var colorHex: String?
-
-    init(folderID: String, isPinned: Bool = false, orderIndex: Int = 0, colorHex: String? = nil) {
-        self.folderID = folderID
-        self.isPinned = isPinned
-        self.orderIndex = orderIndex
-        self.colorHex = colorHex
-    }
-}
-
 /// A reusable text snippet managed in EdgeNoted.
 @Model
 final class Snippet {

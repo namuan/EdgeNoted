@@ -41,4 +41,24 @@ struct SettingsStoreTests {
         let custom = SettingsStore(defaults: customDefaults)
         #expect(custom.hotKeyDescription == "⌥⇧N")
     }
+
+    @Test("Configured note defaults to nil and persists")
+    func configuredNotePersistence() throws {
+        let suite = "SettingsStoreTests-note-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let settings = SettingsStore(defaults: defaults)
+
+        #expect(settings.configuredNoteID == nil)
+        #expect(settings.configuredNoteFolderName == nil)
+        #expect(settings.configuredNoteName == nil)
+
+        settings.configuredNoteID = "n42"
+        settings.configuredNoteFolderName = "Work"
+        settings.configuredNoteName = "Agenda"
+
+        let reloaded = SettingsStore(defaults: defaults)
+        #expect(reloaded.configuredNoteID == "n42")
+        #expect(reloaded.configuredNoteFolderName == "Work")
+        #expect(reloaded.configuredNoteName == "Agenda")
+    }
 }

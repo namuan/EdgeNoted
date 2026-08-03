@@ -28,6 +28,11 @@ struct AppStateIntegrationTests {
         }
         defaults.removePersistentDomain(forName: suiteName)
         let settings = SettingsStore(defaults: defaults)
+        // The harness displays "n1" as the single configured note, as picked
+        // in Settings.
+        settings.configuredNoteID = "n1"
+        settings.configuredNoteFolderName = "Work"
+        settings.configuredNoteName = "Meeting"
         let state = AppState(notes: notes, reminders: reminders, settings: settings, modelContainer: container)
         return Harness(state: state, notes: notes)
     }
@@ -38,6 +43,42 @@ struct AppStateIntegrationTests {
         await harness.state.startup()
         #expect(harness.state.folders.count == 2)
         #expect(harness.state.reminderLists.count == 2)
+    }
+
+    @Test("Startup loads the single configured note into the editor")
+    func startupLoadsConfiguredNote() async throws {
+        let harness = try await makeHarness()
+        await harness.state.startup()
+        #expect(harness.state.selectedNoteID == "n1")
+        #expect(harness.state.selectedFolderName == "Work")
+        #expect(harness.state.draftTitle == "Meeting")
+        #expect(harness.state.draftBody == "Discuss roadmap")
+    }
+
+    @Test("Startup with no configured note leaves the editor empty")
+    func startupWithNoConfiguredNote() async throws {
+        let harness = try await makeHarness()
+        harness.state.settings.configuredNoteID = nil
+        harness.state.settings.configuredNoteFolderName = nil
+        harness.state.settings.configuredNoteName = nil
+        await harness.state.startup()
+        #expect(harness.state.selectedNoteID == nil)
+        #expect(harness.state.draftBody.isEmpty)
+        #expect(harness.state.draftTitle.isEmpty)
+    }
+
+    @Test("Reconfiguring the displayed note reloads it")
+    func reconfiguringNoteReloads() async throws {
+        let harness = try await makeHarness()
+        await harness.state.startup()
+        await harness.notes.seed(id: "n2", name: "Second", body: "Other body", folderName: "Work")
+        harness.state.settings.configuredNoteID = "n2"
+        harness.state.settings.configuredNoteFolderName = "Work"
+        harness.state.settings.configuredNoteName = "Second"
+        await harness.state.loadConfiguredNote()
+        #expect(harness.state.selectedNoteID == "n2")
+        #expect(harness.state.draftBody == "Other body")
+        #expect(harness.state.selectedFolderName == "Work")
     }
 
     @Test("ensureStarted loads services exactly once")
@@ -66,8 +107,6 @@ struct AppStateIntegrationTests {
     func metadataStoresFolderID() async throws {
         let harness = try await makeHarness()
         await harness.state.startup()
-        harness.state.selectFolder("Work")
-        harness.state.selectNote("n1")
         await waitForNoteOpen(harness.state)
         harness.state.togglePin()
         let context = harness.state.modelContainer.mainContext

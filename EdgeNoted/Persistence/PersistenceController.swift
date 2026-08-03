@@ -22,7 +22,6 @@ enum PersistenceController {
     private static func makeContainer(isStoredInMemoryOnly: Bool) throws -> ModelContainer {
         let schema = Schema([
             NoteMeta.self,
-            FolderMeta.self,
             Snippet.self,
         ])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: isStoredInMemoryOnly)

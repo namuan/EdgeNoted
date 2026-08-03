@@ -44,15 +44,9 @@ final class AppState {
     var automationError: String?
     var automationNeedsAppLaunch = false
 
-    // MARK: Notes browsing
+    // MARK: Notes
 
     var folders: [NotesFolder] = []
-    var notesList: [NoteSummary] = []
-    var searchText = "" {
-        didSet { searchDebouncer?.schedule() }
-    }
-
-    var searchResults: [NoteSummary] = []
     var selectedFolderName: String?
     var selectedNoteID: String?
 
@@ -79,7 +73,6 @@ final class AppState {
     private var sync = NoteDraftSync()
     private var pollTask: Task<Void, Never>?
     private var saveDebouncer: Debouncer?
-    private var searchDebouncer: Debouncer?
     private var lastRemoteMtime: TimeInterval?
     /// The note id with unsaved edits, so a pending save survives switching
     /// notes and never lands on the wrong note.
@@ -98,13 +91,9 @@ final class AppState {
         self.settings = settings
         self.modelContainer = modelContainer
         self.saveDebouncer = nil
-        self.searchDebouncer = nil
         // Self is now fully initialized; safe for closures to capture it.
         self.saveDebouncer = Debouncer(delay: 1.2) { [weak self] in
             await self?.saveNoteNow()
-        }
-        self.searchDebouncer = Debouncer(delay: 0.35) { [weak self] in
-            await self?.performSearch()
         }
     }
 
@@ -158,7 +147,9 @@ final class AppState {
             if selectedListName == nil {
                 selectedListName = loadedLists.first?.name
             }
-            await loadFoldersAndNotes()
+            // Re-home any local metadata that still uses folder names as keys.
+            MetaStore.migrateFolderNameKeys(loadedFolders, in: modelContainer.mainContext)
+            await loadConfiguredNote()
             if let selectedListName {
                 await loadReminders(listName: selectedListName)
             }
@@ -231,42 +222,38 @@ final class AppState {
         }
     }
 
-    // MARK: - Notes browsing
+    // MARK: - Displayed note
 
-    func loadFoldersAndNotes() async {
-        guard searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        isLoading = true
-        do {
-            let loadedFolders = try await notes.fetchFolders()
-            folders = loadedFolders
-            // Re-home any local metadata that still uses folder names as keys.
-            MetaStore.migrateFolderNameKeys(loadedFolders, in: modelContainer.mainContext)
-            let loaded = try await notes.fetchNotes(folderName: selectedFolderName)
-            notesList = loaded
-            if let selected = selectedNoteID, !loaded.contains(where: { $0.id == selected }) {
-                selectedNoteID = nil
-            }
-            Log.info(
-                "Folder/note index loaded",
-                category: .notes,
-                metadata: [
-                    "folders": String(loadedFolders.count),
-                    "notes": String(loaded.count),
-                    "folder": selectedFolderName.map { Log.digest($0) } ?? "all",
-                ]
-            )
-        } catch {
-            handleServiceError(error)
+    /// Loads the single note chosen in Settings into the editor. Called at
+    /// startup and whenever the configured note changes. Flushes unsaved edits
+    /// of the previously displayed note before switching.
+    func loadConfiguredNote() async {
+        let targetID = settings.configuredNoteID
+        if let pending = pendingSaveNoteID, pending != targetID, sync.isDirty {
+            saveDebouncer?.cancel()
+            let snapshotTitle = draftTitle
+            let snapshotBody = draftBody
+            await saveNoteNow(force: true, noteID: pending, title: snapshotTitle, body: snapshotBody)
         }
-        isLoading = false
+        pendingSaveNoteID = nil
+        selectedFolderName = settings.configuredNoteFolderName
+        noteLoadSequence += 1
+        selectedNoteID = targetID
+        conflict = nil
+        guard let targetID else {
+            draftTitle = ""
+            draftBody = ""
+            noteIsReadOnly = false
+            sync = NoteDraftSync()
+            pollTask?.cancel()
+            return
+        }
+        await openNote(targetID)
     }
 
-    func selectFolder(_ name: String?) {
-        guard selectedFolderName != name else { return }
-        selectedFolderName = name
-        searchText = ""
-        searchResults = []
-        Task { await loadFoldersAndNotes() }
+    /// Called by the Settings picker after the displayed note changes.
+    func reloadConfiguredNote() {
+        Task { await loadConfiguredNote() }
     }
 
     func selectNote(_ id: String?) {
@@ -381,34 +368,6 @@ final class AppState {
         isSaving = false
         lastSavedAt = nil
         saveDebouncer?.schedule()
-    }
-
-    func newNote() {
-        Task {
-            isLoading = true
-            do {
-                let detail = try await notes.createNote(title: "Untitled", body: "", folderName: selectedFolderName)
-                Log.info(
-                    "Note created",
-                    category: .notes,
-                    metadata: [
-                        "noteId": detail.id,
-                        "folder": selectedFolderName.map { Log.digest($0) } ?? "all",
-                    ]
-                )
-                selectedNoteID = detail.id
-                await loadFoldersAndNotes()
-                await openNote(detail.id)
-            } catch {
-                handleServiceError(error)
-                Log.error(
-                    "Failed to create note",
-                    category: .notes,
-                    metadata: ["folder": selectedFolderName.map { Log.digest($0) } ?? "all"]
-                )
-            }
-            isLoading = false
-        }
     }
 
     func convertToPlainText() {
@@ -619,31 +578,6 @@ final class AppState {
         noteIsReadOnly = !NoteBodyClassifier.isEditableAsPlainText(banner.remoteBody)
         conflict = nil
         lastSavedAt = Date()
-    }
-
-    // MARK: - Search
-
-    private func performSearch() async {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else {
-            searchResults = []
-            await loadFoldersAndNotes()
-            return
-        }
-        do {
-            searchResults = try await notes.searchNotes(query: query)
-            Log.info(
-                "Note search completed",
-                category: .notes,
-                metadata: [
-                    "queryLength": String(query.count),
-                    "results": String(searchResults.count),
-                ]
-            )
-        } catch {
-            // Search failures are non-fatal.
-            Log.warning("Note search failed", category: .notes, metadata: ["queryLength": String(query.count)])
-        }
     }
 
     // MARK: - Reminders

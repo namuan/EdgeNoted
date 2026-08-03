@@ -14,9 +14,9 @@ struct NoteEditorView: View {
                 editor(noteID: noteID)
             } else {
                 ContentUnavailableView(
-                    "No note selected",
+                    "No note configured",
                     systemImage: "note.text",
-                    description: Text("Select a note from the list, or press ⌘N to create one.")
+                    description: Text("Choose a note in Settings to display it here.")
                 )
             }
         }

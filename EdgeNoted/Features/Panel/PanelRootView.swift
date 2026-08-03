@@ -40,10 +40,9 @@ struct PanelRootView: View {
     private var theme: Theme { settings.activeTheme() }
 }
 
-/// Top bar: section switcher, new note, settings, hide, search.
+/// Top bar: section switcher, settings, hide.
 private struct PanelHeaderView: View {
     @Environment(AppState.self) private var appState
-    @Environment(SettingsStore.self) private var settings
 
     var body: some View {
         @Bindable var appState = appState
@@ -59,16 +58,6 @@ private struct PanelHeaderView: View {
                 .frame(width: 180)
 
                 Spacer()
-
-                if appState.activeSection == .notes {
-                    Button {
-                        appState.newNote()
-                    } label: {
-                        Image(systemName: "square.and.pencil")
-                    }
-                    .help("New note (⌘N)")
-                    .keyboardShortcut("n", modifiers: .command)
-                }
 
                 Button {
                     appState.coordinator?.openSettings()
@@ -87,32 +76,8 @@ private struct PanelHeaderView: View {
             .padding(.horizontal, 12)
             .padding(.top, 10)
             .padding(.bottom, 8)
-
-            if appState.activeSection == .notes {
-                HStack(spacing: 6) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-                    TextField("Search notes", text: $appState.searchText)
-                        .textFieldStyle(.plain)
-                    if !appState.searchText.isEmpty {
-                        Button {
-                            appState.searchText = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.secondary)
-                    }
-                }
-                .padding(6)
-                .background(theme.secondaryColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 6))
-                .padding(.horizontal, 12)
-                .padding(.bottom, 8)
-            }
         }
     }
-
-    private var theme: Theme { settings.activeTheme() }
 }
 
 /// Shown when the remote note changed while local edits were pending.

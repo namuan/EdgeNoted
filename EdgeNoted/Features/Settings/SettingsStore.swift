@@ -41,6 +41,9 @@ final class SettingsStore {
         static let noteColorMode = "noteColorMode"
         static let customThemes = "customThemes"
         static let launchAtLogin = "launchAtLogin"
+        static let configuredNoteID = "configuredNoteID"
+        static let configuredNoteFolderName = "configuredNoteFolderName"
+        static let configuredNoteName = "configuredNoteName"
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -127,6 +130,25 @@ final class SettingsStore {
         didSet { defaults.set(launchAtLogin, forKey: Keys.launchAtLogin) }
     }
 
+    // MARK: Displayed note
+
+    /// The single Apple Notes note the panel displays. Selected in Settings.
+    var configuredNoteID: String? {
+        didSet { defaults.set(configuredNoteID, forKey: Keys.configuredNoteID) }
+    }
+
+    /// Name of the folder the configured note lives in; used to resolve the
+    /// real folder ID for local metadata (pins, fold state, colors).
+    var configuredNoteFolderName: String? {
+        didSet { defaults.set(configuredNoteFolderName, forKey: Keys.configuredNoteFolderName) }
+    }
+
+    /// Display name of the configured note, stored so Settings can show a
+    /// label even before the note list has been loaded.
+    var configuredNoteName: String? {
+        didSet { defaults.set(configuredNoteName, forKey: Keys.configuredNoteName) }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         let storedKeyCode = defaults.object(forKey: Keys.hotKeyCode) as? Int ?? 45  // kVK_ANSI_N
@@ -165,6 +187,9 @@ final class SettingsStore {
         noteColorMode = NoteColorMode(rawValue: defaults.string(forKey: Keys.noteColorMode) ?? "") ?? .accentBar
         customThemesData = defaults.data(forKey: Keys.customThemes)
         launchAtLogin = defaults.bool(forKey: Keys.launchAtLogin)
+        configuredNoteID = defaults.string(forKey: Keys.configuredNoteID)
+        configuredNoteFolderName = defaults.string(forKey: Keys.configuredNoteFolderName)
+        configuredNoteName = defaults.string(forKey: Keys.configuredNoteName)
     }
 
     // MARK: Derived

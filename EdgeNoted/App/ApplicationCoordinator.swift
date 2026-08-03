@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 
 /// Owns the floating panel, open bar, global hotkey, and hot-side monitor, and
 /// wires them to AppState.
@@ -11,6 +12,10 @@ final class ApplicationCoordinator {
     private var openBarController: OpenBarController?
     private var hotSideMonitor: HotSideMonitor?
     private var didStart = false
+    /// Manually hosted settings window. The SwiftUI `Settings` scene's
+    /// `showSettingsWindow:` action is unreliable from a non-activating panel
+    /// in an LSUIElement app, so the coordinator owns a real window instead.
+    private var settingsWindow: NSWindow?
 
     init(appState: AppState, settings: SettingsStore) {
         self.appState = appState
@@ -92,7 +97,36 @@ final class ApplicationCoordinator {
 
     func openSettings() {
         Log.info("Settings requested", category: .settings)
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        let window: NSWindow
+        if let existing = settingsWindow {
+            window = existing
+        } else {
+            window = makeSettingsWindow()
+            settingsWindow = window
+        }
+        // The panel is non-activating, so the app is still inactive when the
+        // settings button is clicked. Activate it or the window stays behind.
+        NSApp.activate(ignoringOtherApps: true)
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    /// Builds a standard window hosting the SwiftUI SettingsView with the same
+    /// environment wiring the panel uses.
+    private func makeSettingsWindow() -> NSWindow {
+        let hosting = NSHostingController(
+            rootView: SettingsView()
+                .environment(appState)
+                .environment(settings)
+                .modelContainer(PersistenceController.container)
+        )
+        let window = NSWindow(contentViewController: hosting)
+        window.title = "EdgeNoted Settings"
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.isReleasedWhenClosed = false
+        window.collectionBehavior = [.moveToActiveSpace]
+        window.tabbingMode = .disallowed
+        return window
     }
 
     // MARK: - Settings-driven updates

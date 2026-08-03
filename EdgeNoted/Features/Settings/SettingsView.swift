@@ -10,6 +10,8 @@ struct SettingsView: View {
         TabView {
             GeneralSettingsTab()
                 .tabItem { Label("General", systemImage: "gearshape") }
+            NoteSettingsTab()
+                .tabItem { Label("Note", systemImage: "note.text") }
             AppearanceSettingsTab()
                 .tabItem { Label("Appearance", systemImage: "paintpalette") }
             SnippetsSettingsTab()
@@ -128,6 +130,113 @@ private struct HotKeySettingRow: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Note
+
+private struct NoteSettingsTab: View {
+    private static let notesFolderName = "Notes"
+
+    @Environment(AppState.self) private var appState
+    @Environment(SettingsStore.self) private var settings
+    @State private var folders: [NotesFolder] = []
+    @State private var notesByFolder: [String: [NoteSummary]] = [:]
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        Form {
+            Section {
+                if isLoading {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Loading your notes…")
+                            .foregroundStyle(.secondary)
+                    }
+                } else if let errorMessage {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(errorMessage)
+                            .foregroundStyle(.red)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Button("Retry") {
+                            Task { await loadNotes() }
+                        }
+                    }
+                } else {
+                    Picker("Displayed note", selection: noteSelection) {
+                        Text("None").tag(nil as String?)
+                        ForEach(folders) { folder in
+                            Section(folder.name) {
+                                ForEach(notesByFolder[folder.name] ?? []) { note in
+                                    Text(note.name).tag(note.id as String?)
+                                }
+                            }
+                        }
+                    }
+                }
+            } header: {
+                Text("Displayed note")
+            } footer: {
+                Text(
+                    "The panel shows exactly this one note. Pick a different note "
+                        + "here to change what the panel displays."
+                )
+            }
+        }
+        .formStyle(.grouped)
+        .task { await loadNotes() }
+    }
+
+    private var noteSelection: Binding<String?> {
+        Binding(
+            get: { settings.configuredNoteID },
+            set: { newValue in
+                settings.configuredNoteID = newValue
+                updateConfiguredNoteMetadata(for: newValue)
+                appState.reloadConfiguredNote()
+            }
+        )
+    }
+
+    /// Keeps the stored folder name and display name in sync with the chosen
+    /// note so metadata can resolve the real folder ID later.
+    private func updateConfiguredNoteMetadata(for noteID: String?) {
+        guard let noteID else {
+            settings.configuredNoteFolderName = nil
+            settings.configuredNoteName = nil
+            return
+        }
+        for folder in folders {
+            guard let notes = notesByFolder[folder.name] else { continue }
+            if let note = notes.first(where: { $0.id == noteID }) {
+                settings.configuredNoteFolderName = folder.name
+                settings.configuredNoteName = note.name
+                return
+            }
+        }
+        settings.configuredNoteFolderName = nil
+        settings.configuredNoteName = nil
+    }
+
+    private func loadNotes() async {
+        isLoading = true
+        errorMessage = nil
+        do {
+            let loadedFolders = try await appState.notes.fetchFolders()
+            let notesFolders = loadedFolders.filter { $0.name == Self.notesFolderName }
+            var loadedByFolder: [String: [NoteSummary]] = [:]
+            for folder in notesFolders {
+                let notes = try await appState.notes.fetchNotes(folderName: folder.name)
+                loadedByFolder[folder.name] = notes
+            }
+            folders = notesFolders
+            notesByFolder = loadedByFolder
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isLoading = false
     }
 }
 

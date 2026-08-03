@@ -103,44 +103,6 @@ enum MetaStore {
         orderedNoteMetas(folderID: folderID, in: context).count
     }
 
-    // MARK: Folders
-
-    static func folderMeta(_ folderID: String, in context: ModelContext) -> FolderMeta? {
-        let descriptor = FetchDescriptor<FolderMeta>(predicate: #Predicate { $0.folderID == folderID })
-        return try? context.fetch(descriptor).first
-    }
-
-    static func folderMeta(createIfNeededFor folderID: String, in context: ModelContext) -> FolderMeta {
-        if let existing = folderMeta(folderID, in: context) {
-            return existing
-        }
-        let meta = FolderMeta(folderID: folderID, orderIndex: nextFolderOrderIndex(in: context))
-        context.insert(meta)
-        try? context.save()
-        return meta
-    }
-
-    static func setFolderPinned(_ pinned: Bool, folderID: String, in context: ModelContext) {
-        let meta = folderMeta(createIfNeededFor: folderID, in: context)
-        meta.isPinned = pinned
-        try? context.save()
-    }
-
-    static func setFolderColor(_ colorHex: String?, folderID: String, in context: ModelContext) {
-        let meta = folderMeta(createIfNeededFor: folderID, in: context)
-        meta.colorHex = colorHex
-        try? context.save()
-    }
-
-    static func orderedFolderMetas(in context: ModelContext) -> [FolderMeta] {
-        let descriptor = FetchDescriptor<FolderMeta>(sortBy: [SortDescriptor(\FolderMeta.orderIndex)])
-        return (try? context.fetch(descriptor)) ?? []
-    }
-
-    private static func nextFolderOrderIndex(in context: ModelContext) -> Int {
-        orderedFolderMetas(in: context).count
-    }
-
     // MARK: Snippets
 
     static func addSnippet(title: String, text: String, in context: ModelContext) {

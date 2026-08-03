@@ -29,8 +29,6 @@ protocol NotesService: Sendable {
     /// inside that folder.
     func fetchNotes(folderName: String?) async throws -> [NoteSummary]
     func fetchNote(id: String) async throws -> NoteDetail
-    func searchNotes(query: String) async throws -> [NoteSummary]
-    func createNote(title: String, body: String, folderName: String?) async throws -> NoteDetail
     func updateNote(id: String, title: String, body: String) async throws
 }
 
@@ -73,25 +71,6 @@ final class AppleScriptNotesService: NotesService, @unchecked Sendable {
                 body: entry.bodyStr ?? "",
                 modificationEpoch: entry.modEpoch
             )
-        }
-    }
-
-    func searchNotes(query: String) async throws -> [NoteSummary] {
-        try await logged("searchNotes") {
-            let output = try await executor.run(command: "search", arguments: [query])
-            let entries = try decode([NoteListEntry].self, from: output)
-            return entries.map { NoteSummary(id: $0.idStr, name: $0.nameStr) }
-        }
-    }
-
-    func createNote(title: String, body: String, folderName: String?) async throws -> NoteDetail {
-        try await logged("createNote") {
-            let output = try await executor.run(command: "create", arguments: [folderName ?? "ALL", title, body])
-            let entry = try decode(NoteEntry.self, from: output)
-            if let error = entry.errorStr {
-                throw ScriptError.executionFailed(error)
-            }
-            return NoteDetail(id: entry.idStr ?? "", name: entry.nameStr ?? title, body: body, modificationEpoch: nil)
         }
     }
 
@@ -218,18 +197,6 @@ actor FakeNotesService: NotesService {
             throw ScriptError.executionFailed("Note not found: \(id)")
         }
         return NoteDetail(id: id, name: note.name, body: note.body, modificationEpoch: note.modificationEpoch)
-    }
-
-    func searchNotes(query: String) async throws -> [NoteSummary] {
-        store
-            .filter { $0.value.name.localizedCaseInsensitiveContains(query) }
-            .map { NoteSummary(id: $0.key, name: $0.value.name) }
-    }
-
-    func createNote(title: String, body: String, folderName: String?) async throws -> NoteDetail {
-        let id = "fake-note-\(store.count + 1)"
-        store[id] = StoredNote(name: title, body: body, folderName: folderName, modificationEpoch: nextEpoch())
-        return NoteDetail(id: id, name: title, body: body, modificationEpoch: nil)
     }
 
     func updateNote(id: String, title: String, body: String) async throws {

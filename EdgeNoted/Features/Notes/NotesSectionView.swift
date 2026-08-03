@@ -1,14 +1,8 @@
 import SwiftUI
 
-/// Notes browsing: folders sidebar + notes list + single-note editor.
+/// Single-note view: the panel shows exactly one note, chosen in Settings.
 struct NotesSectionView: View {
     var body: some View {
-        HStack(spacing: 0) {
-            NotesSidebarView()
-            Rectangle()
-                .fill(.secondary.opacity(0.2))
-                .frame(width: 1)
-            NoteEditorView()
-        }
+        NoteEditorView()
     }
 }
