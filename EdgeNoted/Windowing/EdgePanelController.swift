@@ -47,7 +47,7 @@ final class EdgePanelController: NSObject {
         guard !panel.isVisible else { return }
         let screen = Self.screenForPresentation()
         let frame = ScreenEdgeGeometry.visibleFrame(
-            screen: screen.frame,
+            screen: screen.visibleFrame,
             edge: settings.hotSideEdge,
             panelSize: settings.panelSize,
             margin: settings.panelMargin
@@ -125,7 +125,7 @@ final class EdgePanelController: NSObject {
             let screen = Self.screenForPresentation()
             panel.setFrame(
                 ScreenEdgeGeometry.visibleFrame(
-                    screen: screen.frame,
+                    screen: screen.visibleFrame,
                     edge: settings.hotSideEdge,
                     panelSize: size,
                     margin: settings.panelMargin

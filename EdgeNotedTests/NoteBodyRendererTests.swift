@@ -81,4 +81,26 @@ struct NoteBodyClassifierTests {
         let stripped = NoteBodyClassifier.strippedForDisplay("<div>Hi &amp; bye<br>there</div>")
         #expect(stripped == "Hi & bye\nthere")
     }
+
+    @Test("Structural HTML from Apple Notes preserves blank lines")
+    func appleNotesStructuralHTML() {
+        let body = "<div>Title</div>\n<div>alpha</div>\n<div><br></div>\n<div>beta &amp gamma</div>\n"
+        #expect(NoteBodyClassifier.displayText(body) == "Title\nalpha\n\nbeta & gamma")
+    }
+
+    @Test("Writing HTML preserves line structure and escapes text")
+    func writingHTML() {
+        let body = "Title & <Plan>\r\nfirst\n\nlast"
+        let html = NoteBodyClassifier.htmlForWriting(body)
+        #expect(html == "<div>Title &amp; &lt;Plan&gt;</div><div>first</div><div><br></div><div>last</div>")
+        #expect(NoteBodyClassifier.displayText(html) == "Title & <Plan>\nfirst\n\nlast")
+    }
+
+    @Test("Writing HTML preserves leading and trailing blank lines")
+    func writingHTMLPreservesBoundaryBlankLines() {
+        let body = "\nTitle\n"
+        let appleNotesBody = "<div><br></div>\n<div>Title</div>\n<div><br></div>\n"
+        #expect(NoteBodyClassifier.htmlForWriting(body) == "<div><br></div><div>Title</div><div><br></div>")
+        #expect(NoteBodyClassifier.displayText(appleNotesBody) == body)
+    }
 }

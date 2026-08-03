@@ -9,6 +9,7 @@ import Foundation
 /// explicit opt-in to convert, because rewriting them as text would destroy
 /// the formatting.
 enum NoteBodyClassifier {
+    private static let emptyLineToken = "\u{E000}"
     private static let richTagPattern =
         #"<\s*(?:h[1-6]|ul|ol|li|b|strong|i|em|u|img|a|span|table|pre|code|blockquote)[\s>]"#
 
@@ -45,37 +46,74 @@ enum NoteBodyClassifier {
         isPlainText(body) ? body : strippedForDisplay(body)
     }
 
+    /// Converts the editor's plain text into structural HTML that Apple Notes
+    /// preserves when assigned through AppleScript.
+    static func htmlForWriting(_ body: String) -> String {
+        let normalizedBody = body
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+        return normalizedBody
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { line in
+                line.isEmpty ? "<div><br></div>" : "<div>\(escapedForHTML(String(line)))</div>"
+            }
+            .joined()
+    }
+
     /// Strips HTML tags for display purposes only (never written back).
     static func strippedForDisplay(_ body: String) -> String {
-        guard let lineBreakRegex = try? NSRegularExpression(
-            pattern: #"<\s*br\s*/?\s*>|</\s*(?:div|p)\s*>"#,
-            options: [.caseInsensitive]
-        ) else {
-            return body
-        }
         guard let regex = try? NSRegularExpression(pattern: #"<[^>]+>"#, options: [.caseInsensitive]) else {
             return body
         }
-        let textNS = body as NSString
-        let range = NSRange(location: 0, length: textNS.length)
-        let textWithLineBreaks = lineBreakRegex.stringByReplacingMatches(
-            in: body,
-            range: range,
-            withTemplate: "\n"
+        let textWithEmptyLineTokens = body.replacingOccurrences(
+            of: #"<\s*(?:div|p)\s*>\s*<\s*br\s*/?\s*>\s*</\s*(?:div|p)\s*>(?:\r\n|\r|\n)?"#,
+            with: emptyLineToken,
+            options: [.regularExpression, .caseInsensitive]
         )
+        let textWithLineBreaks = textWithEmptyLineTokens
+            .replacingOccurrences(
+                of: #"<\s*br\s*/?\s*>"#,
+                with: "\n",
+                options: [.regularExpression, .caseInsensitive]
+            )
+            .replacingOccurrences(
+                of: #"</\s*(?:div|p)\s*>(?:\r\n|\r|\n)?"#,
+                with: "\n",
+                options: [.regularExpression, .caseInsensitive]
+            )
         let cleaned = regex.stringByReplacingMatches(
             in: textWithLineBreaks,
             range: NSRange(location: 0, length: (textWithLineBreaks as NSString).length),
             withTemplate: ""
         )
+        var displayText = cleaned
+        if displayText.hasSuffix(emptyLineToken) {
+            displayText.removeLast(emptyLineToken.count)
+        } else if displayText.hasSuffix("\n") {
+            displayText.removeLast()
+        }
         return
-            cleaned
-            .replacingOccurrences(of: "&amp;", with: "&")
+            displayText
             .replacingOccurrences(of: "&lt;", with: "<")
             .replacingOccurrences(of: "&gt;", with: ">")
             .replacingOccurrences(of: "&quot;", with: "\"")
             .replacingOccurrences(of: "&#39;", with: "'")
             .replacingOccurrences(of: "&nbsp;", with: " ")
-            .trimmingCharacters(in: .newlines)
+            .replacingOccurrences(of: "&lt", with: "<")
+            .replacingOccurrences(of: "&gt", with: ">")
+            .replacingOccurrences(of: "&quot", with: "\"")
+            .replacingOccurrences(of: "&#39", with: "'")
+            .replacingOccurrences(of: "&nbsp", with: " ")
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&amp", with: "&")
+            .replacingOccurrences(of: emptyLineToken, with: "\n")
+    }
+
+    private static func escapedForHTML(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
     }
 }

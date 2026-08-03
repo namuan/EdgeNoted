@@ -141,15 +141,17 @@ final class AppState {
         automationError = nil
         let startedAt = Date()
         do {
-            let (loadedFolders, loadedLists) = try await loadServicesWithLaunchRetry()
+            async let loadedLists = loadReminderListsWithLaunchRetry()
+            let loadedFolders = try await loadNotesFoldersWithLaunchRetry()
             folders = loadedFolders
-            reminderLists = loadedLists
+            await loadConfiguredNote()
+            let loadedReminderLists = try await loadedLists
+            reminderLists = loadedReminderLists
             if selectedListName == nil {
-                selectedListName = loadedLists.first?.name
+                selectedListName = loadedReminderLists.first?.name
             }
             // Re-home any local metadata that still uses folder names as keys.
             MetaStore.migrateFolderNameKeys(loadedFolders, in: modelContainer.mainContext)
-            await loadConfiguredNote()
             if let selectedListName {
                 await loadReminders(listName: selectedListName)
             }
@@ -160,7 +162,7 @@ final class AppState {
                 category: .sync,
                 metadata: [
                     "folders": String(loadedFolders.count),
-                    "lists": String(loadedLists.count),
+                    "lists": String(loadedReminderLists.count),
                     "elapsedMs": String(Int(Date().timeIntervalSince(startedAt) * 1000)),
                 ]
             )
@@ -177,12 +179,9 @@ final class AppState {
         isLoading = false
     }
 
-    /// Loads the folder/list indexes, making sure Notes and Reminders are
-    /// running first. In the sandbox the AppleScript helper cannot launch
-    /// target apps itself (which surfaces as -600 "Application isn't
-    /// running"), so EdgeNoted launches them via LaunchServices and retries a
-    /// few times while they start up.
-    private func loadServicesWithLaunchRetry() async throws -> ([NotesFolder], [ReminderList]) {
+    /// Runs an Apple automation request, launching its target app and retrying
+    /// if it is still starting up.
+    private func loadWithLaunchRetry<T>(_ operation: () async throws -> T) async throws -> T {
         launchAutomationApps()
         Log.info("Ensuring Notes and Reminders are running", category: .bridge)
         var lastError: Error?
@@ -193,9 +192,7 @@ final class AppState {
                 launchAutomationApps()
             }
             do {
-                async let folders = notes.fetchFolders()
-                async let lists = reminders.fetchLists()
-                return try await (folders, lists)
+                return try await operation()
             } catch let error as ScriptError {
                 lastError = error
                 if case .appNotRunning = error {
@@ -205,6 +202,14 @@ final class AppState {
             }
         }
         throw lastError ?? ScriptError.executionFailed("Could not connect to Apple Notes and Reminders")
+    }
+
+    private func loadNotesFoldersWithLaunchRetry() async throws -> [NotesFolder] {
+        try await loadWithLaunchRetry { try await notes.fetchFolders() }
+    }
+
+    private func loadReminderListsWithLaunchRetry() async throws -> [ReminderList] {
+        try await loadWithLaunchRetry { try await reminders.fetchLists() }
     }
 
     private func launchAutomationApps() {
@@ -343,10 +348,6 @@ final class AppState {
 
     // MARK: - Note editing
 
-    func titleChanged() {
-        markDirty()
-    }
-
     func bodyChanged() {
         markDirty()
     }
@@ -368,15 +369,6 @@ final class AppState {
         isSaving = false
         lastSavedAt = nil
         saveDebouncer?.schedule()
-    }
-
-    func convertToPlainText() {
-        guard noteIsReadOnly, !draftBody.isEmpty else { return }
-        draftBody = NoteBodyClassifier.strippedForDisplay(draftBody)
-        noteIsReadOnly = false
-        sync = NoteDraftSync()
-        sync.load(remoteBody: draftBody)
-        Task { await saveNoteNow(force: true) }
     }
 
     func openSelectedNoteInNotes() {
@@ -402,49 +394,6 @@ final class AppState {
             configuration.activates = true
             NSWorkspace.shared.openApplication(at: url, configuration: configuration) { _, _ in }
         }
-    }
-
-    // MARK: - Local note metadata
-
-    func togglePin() {
-        guard let selectedNoteID, let folderID = resolvedFolderID else { return }
-        let context = modelContainer.mainContext
-        let meta = MetaStore.noteMeta(
-            createIfNeededFor: selectedNoteID,
-            folderID: folderID,
-            in: context
-        )
-        MetaStore.setNotePinned(!meta.isPinned, noteID: selectedNoteID, folderID: folderID, in: context)
-    }
-
-    func toggleFold() {
-        guard let selectedNoteID, let folderID = resolvedFolderID else { return }
-        let context = modelContainer.mainContext
-        let meta = MetaStore.noteMeta(
-            createIfNeededFor: selectedNoteID,
-            folderID: folderID,
-            in: context
-        )
-        MetaStore.setNoteFolded(!meta.isFolded, noteID: selectedNoteID, folderID: folderID, in: context)
-    }
-
-    func setNoteColor(_ hex: String?) {
-        guard let selectedNoteID, let folderID = resolvedFolderID else { return }
-        MetaStore.setNoteColor(
-            hex,
-            noteID: selectedNoteID,
-            folderID: folderID,
-            in: modelContainer.mainContext
-        )
-    }
-
-    func insertSnippet(_ text: String) {
-        guard !noteIsReadOnly else { return }
-        if !draftBody.isEmpty, !draftBody.hasSuffix("\n") {
-            draftBody += "\n"
-        }
-        draftBody += text
-        markDirty()
     }
 
     // MARK: - Save + sync

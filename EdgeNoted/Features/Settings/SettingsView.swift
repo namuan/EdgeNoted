@@ -1,5 +1,4 @@
 import ServiceManagement
-import SwiftData
 import SwiftUI
 
 struct SettingsView: View {
@@ -14,8 +13,6 @@ struct SettingsView: View {
                 .tabItem { Label("Note", systemImage: "note.text") }
             AppearanceSettingsTab()
                 .tabItem { Label("Appearance", systemImage: "paintpalette") }
-            SnippetsSettingsTab()
-                .tabItem { Label("Snippets", systemImage: "text.badge.plus") }
             AutomationSettingsTab()
                 .tabItem { Label("Automation", systemImage: "apple.terminal") }
             AboutSettingsTab()
@@ -58,10 +55,6 @@ private struct GeneralSettingsTab: View {
             Section("Panel") {
                 LabeledContent("Panel width") {
                     Slider(value: $settings.panelWidth, in: 320...700, step: 10)
-                        .frame(width: 160)
-                }
-                LabeledContent("Panel height") {
-                    Slider(value: $settings.panelHeight, in: 400...900, step: 10)
                         .frame(width: 160)
                 }
                 LabeledContent("Sync check every") {
@@ -224,15 +217,10 @@ private struct NoteSettingsTab: View {
         isLoading = true
         errorMessage = nil
         do {
-            let loadedFolders = try await appState.notes.fetchFolders()
-            let notesFolders = loadedFolders.filter { $0.name == Self.notesFolderName }
-            var loadedByFolder: [String: [NoteSummary]] = [:]
-            for folder in notesFolders {
-                let notes = try await appState.notes.fetchNotes(folderName: folder.name)
-                loadedByFolder[folder.name] = notes
-            }
-            folders = notesFolders
-            notesByFolder = loadedByFolder
+            let notes = try await appState.notes.fetchNotes(folderName: Self.notesFolderName)
+            let notesFolder = NotesFolder(id: Self.notesFolderName, name: Self.notesFolderName)
+            folders = [notesFolder]
+            notesByFolder = [notesFolder.name: notes]
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -257,13 +245,6 @@ private struct AppearanceSettingsTab: View {
                 }
                 Button("Add Custom Theme") {
                     _ = settings.addCustomTheme()
-                }
-            }
-            Section("Note Colors") {
-                Picker("Style", selection: $settings.noteColorMode) {
-                    ForEach(NoteColorMode.allCases) { mode in
-                        Text(mode.title).tag(mode)
-                    }
                 }
             }
         }
@@ -350,61 +331,6 @@ private struct AppearanceSettingsTab: View {
                 settings.updateCustomTheme(id: theme.id, hexField: keyPath, to: newColor)
             }
         )
-    }
-}
-
-// MARK: - Snippets
-
-private struct SnippetsSettingsTab: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Snippet.createdAt) private var snippets: [Snippet]
-    @State private var title = ""
-    @State private var text = ""
-
-    var body: some View {
-        Form {
-            Section("New snippet") {
-                TextField("Title", text: $title)
-                TextEditor(text: $text)
-                    .frame(height: 70)
-                HStack {
-                    Spacer()
-                    Button("Add") {
-                        guard !title.isEmpty else { return }
-                        MetaStore.addSnippet(title: title, text: text, in: modelContext)
-                        title = ""
-                        text = ""
-                    }
-                    .disabled(title.isEmpty)
-                }
-            }
-            Section("Saved") {
-                if snippets.isEmpty {
-                    Text("No snippets yet.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(snippets) { snippet in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(snippet.title)
-                                Text(snippet.text)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(2)
-                            }
-                            Spacer()
-                            Button(role: .destructive) {
-                                MetaStore.deleteSnippet(snippet, in: modelContext)
-                            } label: {
-                                Image(systemName: "trash")
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-            }
-        }
-        .formStyle(.grouped)
     }
 }
 

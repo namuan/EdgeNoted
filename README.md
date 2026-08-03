@@ -20,11 +20,9 @@ view and edit a single note instantly, and hides again — no app switching.
   Keep Mine / Take Theirs / Open in Notes — nothing is overwritten silently.
 - **Apple Reminders.** Browse lists, view/create/edit/complete reminders, set
   due dates and priorities, and quick-capture new ones.
-- **Local organization** (kept in EdgeNoted only, never touches your notes):
-  pinning notes and folders, reordering, folding notes, note colors (accent bar
-  or full background), themes (built-in + custom), snippets, and search.
+- **Themes:** choose built-in themes or create your own.
 - **Extras:** color-code preview (`#rrggbb`/`#rgb` swatches), interactive
-  checklists (`- [ ]` / `- [x]`), and export the current note as a PNG image.
+  checklists (`- [ ]` / `- [x]`).
 - **Keyboard-first:** `⌘N` new note, `Esc` hide, all actions keyboard-accessible.
 - **File logging.** Diagnostics are written to rolling files in
   `~/Library/Logs/EdgeNoted/` (`EdgeNoted.log` rotating to `EdgeNoted-1.log` …
@@ -126,8 +124,8 @@ EdgeNoted/
 ├── Windowing/      # Edge panel, Open Bar, Hot Side monitor, Carbon global hotkey
 ├── Integrations/   # AppleScript executor + Notes/Reminders services (protocols + AppleScript + fakes)
 ├── Sync/           # NoteDraftSync state machine + Debouncer
-├── Persistence/    # SwiftData local metadata (pins, order, colors, snippets)
-├── Features/       # Panel, Notes, Reminders, Export, Settings views
+├── Persistence/    # SwiftData local metadata
+├── Features/       # Panel, Notes, Reminders, Settings views
 ├── DesignSystem/   # Themes, hex color parsing
 └── Utilities/      # Note body classifier + renderer (checklists, hex chips)
 ```

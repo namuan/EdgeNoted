@@ -26,7 +26,8 @@ struct PanelRootView: View {
                 AutomationErrorBar(message: automationError)
             }
         }
-        .frame(width: settings.panelWidth, height: settings.panelHeight)
+        .frame(width: settings.panelWidth)
+        .frame(maxHeight: .infinity)
         .background(theme.backgroundColor)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay {

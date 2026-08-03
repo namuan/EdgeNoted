@@ -76,7 +76,8 @@ final class AppleScriptNotesService: NotesService, @unchecked Sendable {
 
     func updateNote(id: String, title: String, body: String) async throws {
         try await logged("updateNote", noteID: id) {
-            let output = try await executor.run(command: "update", arguments: [id, title, body])
+            let htmlBody = NoteBodyClassifier.htmlForWriting(body)
+            let output = try await executor.run(command: "update", arguments: [id, title, htmlBody])
             guard output.hasPrefix("OK") else {
                 throw ScriptError.executionFailed(output)
             }

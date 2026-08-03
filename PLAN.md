@@ -48,23 +48,17 @@ A persistent, edge-activated companion that surfaces a single Apple Note or Remi
 #### 3.3 Organization & Navigation
 - Folders (sourced from Apple Notes).
 - Quick move between folders.
-- Note colors (full background or left-side color bar).
-- Pin Notes & Folders.
 - Reordering of notes and folders.
-- Fold Notes (collapse/expand).
 - Searching.
 
 #### 3.4 Content Capabilities
 - **Images:** Embed or view screenshots and images already present in Apple Notes.
 - **File & Folder Shortcuts:** Create or open shortcuts to important files or folders.
 - **Color Code Preview:** Enter and preview colors in #rrggbb format (useful for developers/designers).
-- **Snippets:** Reusable text snippets.
 - **Tasks & Checklists:** Native support (aligned with Apple Notes / Reminders task behavior).
-- **Export as Image:** Export the currently displayed note as an image.
 
 #### 3.5 Appearance & Customization
 - Built-in themes + ability to create custom themes.
-- Note colors (full or accent bar).
 - Themes & customization store/page available.
 
 #### 3.6 What’s New in Version 1.6 (Highlighted)

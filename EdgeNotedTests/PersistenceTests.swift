@@ -24,14 +24,12 @@ struct PersistenceTests {
     @Test("NoteMeta round-trips through the store")
     func noteMetaRoundTrip() throws {
         let context = makeContext()
-        let meta = NoteMeta(noteID: "note-1", folderID: "folder-1", isPinned: true, orderIndex: 3, colorHex: "FF0000")
+        let meta = NoteMeta(noteID: "note-1", folderID: "folder-1", orderIndex: 3)
         context.insert(meta)
         try context.save()
 
-        let fetched = try MetaStore.noteMeta("note-1", in: context)
-        #expect(fetched?.isPinned == true)
+        let fetched = MetaStore.noteMeta("note-1", in: context)
         #expect(fetched?.orderIndex == 3)
-        #expect(fetched?.colorHex == "FF0000")
     }
 
     @Test("Create-if-needed does not duplicate by unique noteID")
@@ -40,15 +38,6 @@ struct PersistenceTests {
         let first = MetaStore.noteMeta(createIfNeededFor: "n1", folderID: "f1", in: context)
         let second = MetaStore.noteMeta(createIfNeededFor: "n1", folderID: "f1", in: context)
         #expect(first === second)
-    }
-
-    @Test("Pinning then querying reflects the change")
-    func pinning() throws {
-        let context = makeContext()
-        MetaStore.setNotePinned(true, noteID: "n1", folderID: "f1", in: context)
-        #expect(MetaStore.noteMeta("n1", in: context)?.isPinned == true)
-        MetaStore.setNotePinned(false, noteID: "n1", folderID: "f1", in: context)
-        #expect(MetaStore.noteMeta("n1", in: context)?.isPinned == false)
     }
 
     @Test("Move updates the local ordering of the folder")
@@ -62,23 +51,13 @@ struct PersistenceTests {
         #expect(ordered[0] == "note-2")
     }
 
-    @Test("Snippets are stored and can be deleted")
-    func snippets() throws {
-        let context = makeContext()
-        MetaStore.addSnippet(title: "Greeting", text: "Hi there", in: context)
-        let all = (try context.fetch(FetchDescriptor<Snippet>())) ?? []
-        #expect(all.count == 1)
-        MetaStore.deleteSnippet(all[0], in: context)
-        #expect(((try context.fetch(FetchDescriptor<Snippet>())) ?? []).isEmpty)
-    }
-
     @Test("Folder-name metadata keys migrate to real folder IDs")
     func migrateFolderNameKeys() throws {
         let context = makeContext()
         // Legacy rows created before folder IDs were stored.
-        let legacy = NoteMeta(noteID: "legacy", folderID: "Concepts", isPinned: true)
+        let legacy = NoteMeta(noteID: "legacy", folderID: "Concepts")
         context.insert(legacy)
-        let fresh = NoteMeta(noteID: "fresh", folderID: "f-1", isPinned: false)
+        let fresh = NoteMeta(noteID: "fresh", folderID: "f-1")
         context.insert(fresh)
         // A stale name for a folder that no longer exists.
         let stale = NoteMeta(noteID: "stale", folderID: "Gone Folder")
@@ -88,9 +67,9 @@ struct PersistenceTests {
         let folders = [NotesFolder(id: "f-1", name: "Concepts")]
         MetaStore.migrateFolderNameKeys(folders, in: context)
 
-        #expect(try MetaStore.noteMeta("legacy", in: context)?.folderID == "f-1")
-        #expect(try MetaStore.noteMeta("fresh", in: context)?.folderID == "f-1")
-        #expect(try MetaStore.noteMeta("stale", in: context)?.folderID == "")
+        #expect(MetaStore.noteMeta("legacy", in: context)?.folderID == "f-1")
+        #expect(MetaStore.noteMeta("fresh", in: context)?.folderID == "f-1")
+        #expect(MetaStore.noteMeta("stale", in: context)?.folderID == "")
     }
 
     @Test("Migration survives duplicate folder names and name/id collisions")
@@ -112,8 +91,8 @@ struct PersistenceTests {
         MetaStore.migrateFolderNameKeys(folders, in: context)
 
         // Duplicate names: first wins.
-        #expect(try MetaStore.noteMeta("by-name", in: context)?.folderID == "f-1")
+        #expect(MetaStore.noteMeta("by-name", in: context)?.folderID == "f-1")
         // A real ID that also equals a folder name must not be re-homed.
-        #expect(try MetaStore.noteMeta("by-id", in: context)?.folderID == "f-2")
+        #expect(MetaStore.noteMeta("by-id", in: context)?.folderID == "f-2")
     }
 }

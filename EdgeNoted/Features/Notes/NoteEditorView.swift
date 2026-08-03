@@ -1,17 +1,14 @@
-import SwiftData
 import SwiftUI
 
-/// Single-note editor: title, edit/preview modes, fold, colors, export.
+/// Single-note editor with edit and preview modes.
 struct NoteEditorView: View {
     @Environment(AppState.self) private var appState
     @Environment(SettingsStore.self) private var settings
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Snippet.createdAt) private var snippets: [Snippet]
 
     var body: some View {
         Group {
-            if let noteID = appState.selectedNoteID {
-                editor(noteID: noteID)
+            if appState.selectedNoteID != nil {
+                editor()
             } else {
                 ContentUnavailableView(
                     "No note configured",
@@ -23,16 +20,13 @@ struct NoteEditorView: View {
     }
 
     @ViewBuilder
-    private func editor(noteID: String) -> some View {
-        let meta = noteMetas.first { $0.noteID == noteID }
+    private func editor() -> some View {
         VStack(spacing: 0) {
-            titleBar(meta: meta)
+            titleBar
             Rectangle()
                 .fill(theme.secondaryColor.opacity(0.25))
                 .frame(height: 1)
-            if meta?.isFolded == true {
-                FoldedEditorBar()
-            } else if appState.noteIsReadOnly {
+            if appState.noteIsReadOnly {
                 ReadOnlyEditorView()
             } else if appState.editorMode == .edit {
                 NoteBodyTextEditor()
@@ -43,14 +37,8 @@ struct NoteEditorView: View {
         }
     }
 
-    private var noteMetas: [NoteMeta] {
-        (try? modelContext.fetch(FetchDescriptor<NoteMeta>())) ?? []
-    }
-
-    private func titleBar(meta: NoteMeta?) -> some View {
+    private var titleBar: some View {
         HStack(spacing: 8) {
-            NoteTitleField()
-            Spacer()
             if !appState.noteIsReadOnly {
                 Picker(
                     "Mode",
@@ -66,57 +54,7 @@ struct NoteEditorView: View {
                 .labelsHidden()
                 .frame(width: 130)
             }
-            Button {
-                appState.toggleFold()
-            } label: {
-                Image(systemName: meta?.isFolded == true ? "chevron.right.circle" : "chevron.down.circle")
-            }
-            .help(meta?.isFolded == true ? "Expand note" : "Fold note")
-
-            Button {
-                appState.togglePin()
-            } label: {
-                Image(systemName: meta?.isPinned == true ? "pin.fill" : "pin")
-            }
-            .help(meta?.isPinned == true ? "Unpin note" : "Pin note")
-
-            Menu {
-                ForEach(AppColor.noteColors, id: \.name) { item in
-                    Button {
-                        appState.setNoteColor(item.hex.isEmpty ? nil : item.hex)
-                    } label: {
-                        if item.hex.isEmpty {
-                            Text(item.name)
-                        } else {
-                            Label(item.name, systemImage: "circle.fill")
-                                .foregroundStyle(AppColor.color(forHex: item.hex) ?? .secondary)
-                        }
-                    }
-                }
-            } label: {
-                Image(systemName: "paintpalette")
-            }
-            .help("Note color")
-
-            if !snippets.isEmpty && !appState.noteIsReadOnly {
-                Menu {
-                    ForEach(snippets) { snippet in
-                        Button(snippet.title) {
-                            appState.insertSnippet(snippet.text)
-                        }
-                    }
-                } label: {
-                    Image(systemName: "text.badge.plus")
-                }
-                .help("Insert snippet")
-            }
-
-            Button {
-                exportAsImage()
-            } label: {
-                Image(systemName: "photo")
-            }
-            .help("Export as image")
+            Spacer()
 
             Button {
                 appState.openSelectedNoteInNotes()
@@ -156,27 +94,6 @@ struct NoteEditorView: View {
     }
 
     private var theme: Theme { settings.activeTheme() }
-
-    private func exportAsImage() {
-        NoteImageExporter.export(title: appState.draftTitle, body: appState.draftBody, theme: theme)
-    }
-}
-
-/// Title text field that marks the draft dirty on change.
-private struct NoteTitleField: View {
-    @Environment(AppState.self) private var appState
-    @Environment(SettingsStore.self) private var settings
-
-    var body: some View {
-        @Bindable var appState = appState
-        TextField("Title", text: $appState.draftTitle)
-            .textFieldStyle(.plain)
-            .font(.headline)
-            .onChange(of: appState.draftTitle) { _, _ in
-                appState.titleChanged()
-            }
-            .foregroundStyle(settings.activeTheme().textColor)
-    }
 }
 
 /// Plain-text editor bound to the draft body.
@@ -198,28 +115,6 @@ private struct NoteBodyTextEditor: View {
     }
 }
 
-/// Collapsed view when the note is folded.
-private struct FoldedEditorBar: View {
-    @Environment(AppState.self) private var appState
-    @Environment(SettingsStore.self) private var settings
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "chevron.right.circle")
-            Text(appState.draftTitle.isEmpty ? "Note folded" : appState.draftTitle)
-                .lineLimit(1)
-                .foregroundStyle(theme.secondaryColor)
-            Spacer()
-            Button("Expand") { appState.toggleFold() }
-                .controlSize(.small)
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity)
-    }
-
-    private var theme: Theme { settings.activeTheme() }
-}
-
 /// Read-only display for notes containing rich content that text editing
 /// would destroy.
 private struct ReadOnlyEditorView: View {
@@ -235,14 +130,6 @@ private struct ReadOnlyEditorView: View {
                     .font(.caption)
                     .foregroundStyle(theme.secondaryColor)
                 Spacer()
-                Menu {
-                    Button("Open in Apple Notes") { appState.openSelectedNoteInNotes() }
-                    Button("Convert to plain text") { appState.convertToPlainText() }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
             }
             .padding(8)
             .background(theme.secondaryColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 6))

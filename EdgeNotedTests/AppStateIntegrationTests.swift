@@ -108,12 +108,10 @@ struct AppStateIntegrationTests {
         let harness = try await makeHarness()
         await harness.state.startup()
         await waitForNoteOpen(harness.state)
-        harness.state.togglePin()
         let context = harness.state.modelContainer.mainContext
-        let meta = try MetaStore.noteMeta("n1", in: context)
-        #expect(meta?.folderID == "f-work")  // real ID, not the "Work" name
-        #expect(meta?.folderID != "Work")
-        #expect(meta?.isPinned == true)
+        let meta = MetaStore.noteMeta(createIfNeededFor: "n1", folderID: "f-work", in: context)
+        #expect(meta.folderID == "f-work")  // real ID, not the "Work" name
+        #expect(meta.folderID != "Work")
     }
 
     @Test("Editing then saving writes back to the fake service")

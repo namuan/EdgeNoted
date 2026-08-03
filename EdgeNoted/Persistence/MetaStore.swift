@@ -60,24 +60,6 @@ enum MetaStore {
         }
     }
 
-    static func setNotePinned(_ pinned: Bool, noteID: String, folderID: String, in context: ModelContext) {
-        let meta = noteMeta(createIfNeededFor: noteID, folderID: folderID, in: context)
-        meta.isPinned = pinned
-        try? context.save()
-    }
-
-    static func setNoteFolded(_ folded: Bool, noteID: String, folderID: String, in context: ModelContext) {
-        let meta = noteMeta(createIfNeededFor: noteID, folderID: folderID, in: context)
-        meta.isFolded = folded
-        try? context.save()
-    }
-
-    static func setNoteColor(_ colorHex: String?, noteID: String, folderID: String, in context: ModelContext) {
-        let meta = noteMeta(createIfNeededFor: noteID, folderID: folderID, in: context)
-        meta.colorHex = colorHex
-        try? context.save()
-    }
-
     static func moveNote(noteID: String, folderID: String, to newIndex: Int, in context: ModelContext) {
         let metas = orderedNoteMetas(folderID: folderID, in: context)
             .filter { $0.noteID != noteID }
@@ -103,16 +85,4 @@ enum MetaStore {
         orderedNoteMetas(folderID: folderID, in: context).count
     }
 
-    // MARK: Snippets
-
-    static func addSnippet(title: String, text: String, in context: ModelContext) {
-        let snippet = Snippet(title: title, text: text)
-        context.insert(snippet)
-        try? context.save()
-    }
-
-    static func deleteSnippet(_ snippet: Snippet, in context: ModelContext) {
-        context.delete(snippet)
-        try? context.save()
-    }
 }

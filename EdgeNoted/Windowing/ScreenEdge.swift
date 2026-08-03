@@ -81,29 +81,31 @@ enum ScreenEdgeGeometry {
         return false
     }
 
-    /// Frame for the panel when visible, docked at `edge` of `screen`.
+    /// Frame for the panel when visible, docked at `edge` of the usable screen
+    /// area. Callers provide `NSScreen.visibleFrame` so the panel avoids system
+    /// UI such as the menu bar and Dock.
     static func visibleFrame(screen: CGRect, edge: ScreenEdge, panelSize: CGSize, margin: CGFloat) -> CGRect {
         switch edge {
         case .left:
             return CGRect(
                 x: screen.minX + margin,
-                y: screen.midY - panelSize.height / 2,
+                y: screen.minY,
                 width: panelSize.width,
-                height: panelSize.height
+                height: screen.height
             )
         case .right:
             return CGRect(
                 x: screen.maxX - panelSize.width - margin,
-                y: screen.midY - panelSize.height / 2,
+                y: screen.minY,
                 width: panelSize.width,
-                height: panelSize.height
+                height: screen.height
             )
         case .bottom:
             return CGRect(
                 x: screen.midX - panelSize.width / 2,
-                y: screen.minY + margin,
+                y: screen.minY,
                 width: panelSize.width,
-                height: panelSize.height
+                height: screen.height
             )
         }
     }

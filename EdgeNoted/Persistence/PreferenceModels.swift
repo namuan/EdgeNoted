@@ -7,6 +7,7 @@ import SwiftData
 final class NoteMeta {
     @Attribute(.unique) var noteID: String
     var folderID: String
+    // Retained in the schema so existing on-disk stores remain compatible.
     var isPinned: Bool
     var orderIndex: Int
     var isFolded: Bool
@@ -32,7 +33,7 @@ final class NoteMeta {
     }
 }
 
-/// A reusable text snippet managed in EdgeNoted.
+/// Retained in the schema so existing on-disk stores remain compatible.
 @Model
 final class Snippet {
     var title: String

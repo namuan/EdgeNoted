@@ -45,18 +45,25 @@ struct ScreenEdgeGeometryTests {
         #expect(ScreenEdgeGeometry.edge(containing: point, screens: screens, threshold: 8) == .left)
     }
 
-    @Test("Visible panel frames dock against the chosen edge")
+    @Test("Visible panel frames span the usable screen height")
     func visibleFrames() {
         let size = CGSize(width: 460, height: 600)
-        let right = ScreenEdgeGeometry.visibleFrame(screen: screen, edge: .right, panelSize: size, margin: 0)
+        let usableScreen = CGRect(x: 0, y: 74, width: 1920, height: 982)
+
+        let right = ScreenEdgeGeometry.visibleFrame(screen: usableScreen, edge: .right, panelSize: size, margin: 0)
         #expect(right.maxX == 1920)
         #expect(right.width == 460)
+        #expect(right.minY == usableScreen.minY)
+        #expect(right.height == usableScreen.height)
 
-        let left = ScreenEdgeGeometry.visibleFrame(screen: screen, edge: .left, panelSize: size, margin: 0)
+        let left = ScreenEdgeGeometry.visibleFrame(screen: usableScreen, edge: .left, panelSize: size, margin: 0)
         #expect(left.minX == 0)
+        #expect(left.minY == usableScreen.minY)
+        #expect(left.height == usableScreen.height)
 
-        let bottom = ScreenEdgeGeometry.visibleFrame(screen: screen, edge: .bottom, panelSize: size, margin: 0)
-        #expect(bottom.minY == 0)
+        let bottom = ScreenEdgeGeometry.visibleFrame(screen: usableScreen, edge: .bottom, panelSize: size, margin: 0)
+        #expect(bottom.minY == usableScreen.minY)
+        #expect(bottom.height == usableScreen.height)
     }
 
     @Test("Hidden frames move off-screen in the slide direction")

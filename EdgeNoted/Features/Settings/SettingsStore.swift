@@ -3,21 +3,6 @@ import Foundation
 import Observation
 import SwiftUI
 
-/// How note colors are displayed.
-enum NoteColorMode: String, CaseIterable, Identifiable, Sendable {
-    case accentBar
-    case fullBackground
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .accentBar: "Accent bar"
-        case .fullBackground: "Full background"
-        }
-    }
-}
-
 /// User preferences, persisted in UserDefaults and observed by the UI.
 @Observable
 final class SettingsStore {
@@ -38,7 +23,6 @@ final class SettingsStore {
         static let panelHeight = "panelHeight"
         static let panelMargin = "panelMargin"
         static let themeName = "themeName"
-        static let noteColorMode = "noteColorMode"
         static let customThemes = "customThemes"
         static let launchAtLogin = "launchAtLogin"
         static let configuredNoteID = "configuredNoteID"
@@ -116,10 +100,6 @@ final class SettingsStore {
         didSet { defaults.set(themeName, forKey: Keys.themeName) }
     }
 
-    var noteColorMode: NoteColorMode {
-        didSet { defaults.set(noteColorMode.rawValue, forKey: Keys.noteColorMode) }
-    }
-
     var customThemesData: Data? {
         didSet { defaults.set(customThemesData, forKey: Keys.customThemes) }
     }
@@ -137,8 +117,8 @@ final class SettingsStore {
         didSet { defaults.set(configuredNoteID, forKey: Keys.configuredNoteID) }
     }
 
-    /// Name of the folder the configured note lives in; used to resolve the
-    /// real folder ID for local metadata (pins, fold state, colors).
+    /// Name of the folder the configured note lives in; used to select that
+    /// folder when the configured note is reloaded.
     var configuredNoteFolderName: String? {
         didSet { defaults.set(configuredNoteFolderName, forKey: Keys.configuredNoteFolderName) }
     }
@@ -184,7 +164,6 @@ final class SettingsStore {
         panelHeight = defaults.object(forKey: Keys.panelHeight) as? Double ?? 600
         panelMargin = defaults.object(forKey: Keys.panelMargin) as? Double ?? 0
         themeName = defaults.string(forKey: Keys.themeName) ?? Theme.builtins[0].id
-        noteColorMode = NoteColorMode(rawValue: defaults.string(forKey: Keys.noteColorMode) ?? "") ?? .accentBar
         customThemesData = defaults.data(forKey: Keys.customThemes)
         launchAtLogin = defaults.bool(forKey: Keys.launchAtLogin)
         configuredNoteID = defaults.string(forKey: Keys.configuredNoteID)
