@@ -80,7 +80,9 @@ actor EventKitRemindersService: RemindersService, RemindersChangeObserving {
 
     func fetchLists() async throws -> [ReminderList] {
         try await ensureFullAccess()
-        let calendars = store().calendars(for: .reminder)
+        // Only writable lists can accept new reminders; read-only smart lists
+        // are still surfaced by fetchAllReminders for display.
+        let calendars = store().calendars(for: .reminder).filter(\.allowsContentModifications)
         return calendars
             .map { ReminderList(id: $0.calendarIdentifier, name: $0.title) }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -97,6 +99,32 @@ actor EventKitRemindersService: RemindersService, RemindersChangeObserving {
             calendars: calendars
         )
         return try await fetchReminders(matching: predicate)
+    }
+
+    func createReminder(title: String, inListID listID: String, dueEpoch: TimeInterval?) async throws -> ReminderItem {
+        try await ensureFullAccess()
+        let store = store()
+        guard let calendar = store.calendars(for: .reminder).first(where: { $0.calendarIdentifier == listID }) else {
+            throw RemindersStoreError.listNotFound
+        }
+        guard calendar.allowsContentModifications else {
+            throw RemindersStoreError.listNotWritable
+        }
+        let reminder = EKReminder(eventStore: store)
+        reminder.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        reminder.calendar = calendar
+        if let dueEpoch {
+            reminder.dueDateComponents = EventKitReminderMapping.dueComponents(from: dueEpoch)
+        }
+        try store.save(reminder, commit: true)
+        return ReminderItem(
+            id: reminder.calendarItemIdentifier,
+            name: reminder.title ?? "",
+            isCompleted: false,
+            dueEpoch: dueEpoch,
+            priority: 0,
+            listName: calendar.title
+        )
     }
 
     func updateReminder(
@@ -200,12 +228,20 @@ actor EventKitRemindersService: RemindersService, RemindersChangeObserving {
     }
 }
 
-/// A reminder that existed when the panel loaded but is gone by the time an
-/// update or delete runs.
-enum RemindersStoreError: LocalizedError {
+/// Store-level failures that are neither access denials nor scripting issues.
+enum RemindersStoreError: LocalizedError, Equatable {
     case notFound
+    case listNotFound
+    case listNotWritable
 
     var errorDescription: String? {
-        "That reminder no longer exists in Reminders. The list will refresh."
+        switch self {
+        case .notFound:
+            return "That reminder no longer exists in Reminders. The list will refresh."
+        case .listNotFound:
+            return "That reminder list no longer exists. Pick another list and try again."
+        case .listNotWritable:
+            return "That list doesn't accept new reminders. Pick another list."
+        }
     }
 }

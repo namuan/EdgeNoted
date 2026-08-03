@@ -56,6 +56,7 @@ struct ReminderItem: Identifiable, Hashable, Sendable {
 protocol RemindersService: Sendable {
     func fetchLists() async throws -> [ReminderList]
     func fetchAllReminders() async throws -> [ReminderItem]
+    func createReminder(title: String, inListID listID: String, dueEpoch: TimeInterval?) async throws -> ReminderItem
     func updateReminder(
         id: String,
         title: String?,
@@ -106,6 +107,7 @@ actor FakeRemindersService: RemindersService {
     }
 
     private var lists: [ReminderList]
+    /// Storage is keyed by list ID (not name) so same-named lists stay separate.
     private var store: [String: [String: StoredReminder]]
 
     init(
@@ -115,12 +117,13 @@ actor FakeRemindersService: RemindersService {
         ]
     ) {
         self.lists = lists
-        self.store = Dictionary(uniqueKeysWithValues: lists.map { ($0.name, [:]) })
+        self.store = Dictionary(uniqueKeysWithValues: lists.map { ($0.id, [:]) })
     }
 
     func seed(name: String, listName: String, isCompleted: Bool = false) {
+        guard let listID = lists.first(where: { $0.name == listName })?.id else { return }
         let id = "fake-reminder-\(abs(name.hashValue))"
-        store[listName]?[id] = StoredReminder(name: name, isCompleted: isCompleted, dueEpoch: nil, priority: 0)
+        store[listID]?[id] = StoredReminder(name: name, isCompleted: isCompleted, dueEpoch: nil, priority: 0)
     }
 
     func fetchLists() async throws -> [ReminderList] {
@@ -129,7 +132,7 @@ actor FakeRemindersService: RemindersService {
 
     func fetchAllReminders() async throws -> [ReminderItem] {
         lists.flatMap { list in
-            store[list.name]?.map {
+            store[list.id]?.map {
                 ReminderItem(
                     id: $0.key,
                     name: $0.value.name,
@@ -142,6 +145,22 @@ actor FakeRemindersService: RemindersService {
         }
     }
 
+    func createReminder(title: String, inListID listID: String, dueEpoch: TimeInterval?) async throws -> ReminderItem {
+        guard let list = lists.first(where: { $0.id == listID }) else {
+            throw RemindersStoreError.listNotFound
+        }
+        let id = "fake-reminder-\(UUID().uuidString)"
+        store[listID]?[id] = StoredReminder(name: title, isCompleted: false, dueEpoch: dueEpoch, priority: 0)
+        return ReminderItem(
+            id: id,
+            name: title,
+            isCompleted: false,
+            dueEpoch: dueEpoch,
+            priority: 0,
+            listName: list.name
+        )
+    }
+
     func updateReminder(
         id: String,
         title: String?,
@@ -150,10 +169,10 @@ actor FakeRemindersService: RemindersService {
         priority: Int?,
         clearDueDate: Bool = false
     ) async throws {
-        guard let listName = store.keys.first(where: { store[$0]?[id] != nil }),
-            var reminder = store[listName]?[id]
+        guard let listID = store.keys.first(where: { store[$0]?[id] != nil }),
+            var reminder = store[listID]?[id]
         else {
-            throw ScriptError.executionFailed("Reminder not found: \(id)")
+            throw RemindersStoreError.notFound
         }
         if let title { reminder.name = title }
         if let isCompleted { reminder.isCompleted = isCompleted }
@@ -163,11 +182,11 @@ actor FakeRemindersService: RemindersService {
             reminder.dueEpoch = dueEpoch
         }
         if let priority { reminder.priority = priority }
-        store[listName]?[id] = reminder
+        store[listID]?[id] = reminder
     }
 
     func deleteReminder(id: String) async throws {
-        guard let listName = store.keys.first(where: { store[$0]?[id] != nil }) else { return }
-        store[listName]?.removeValue(forKey: id)
+        guard let listID = store.keys.first(where: { store[$0]?[id] != nil }) else { return }
+        store[listID]?.removeValue(forKey: id)
     }
 }

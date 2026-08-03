@@ -44,6 +44,7 @@ struct AppStateIntegrationTests {
         await harness.state.startup()
         #expect(harness.state.folders.count == 2)
         #expect(harness.state.reminderLists.count == 2)
+        #expect(harness.state.quickCaptureListID == "l-work")
     }
 
     @Test("Startup loads the single configured note into the editor")
@@ -355,5 +356,105 @@ struct AppStateIntegrationTests {
         )
         let cleared = try await reminders.fetchAllReminders()
         #expect(cleared.first?.dueEpoch == nil)
+    }
+
+    @Test("Creating a reminder through the fake lands in the chosen list with its due date")
+    func fakeCreateReminder() async throws {
+        let reminders = FakeRemindersService()
+        let created = try await reminders.createReminder(
+            title: "Ship it",
+            inListID: "l-home",
+            dueEpoch: 1_800_000_000
+        )
+        #expect(created.name == "Ship it")
+        #expect(created.listName == "Home")
+        #expect(!created.isCompleted)
+        #expect(created.dueEpoch == 1_800_000_000)
+        #expect(created.priority == 0)
+        let all = try await reminders.fetchAllReminders()
+        #expect(all.contains { $0.id == created.id && $0.listName == "Home" })
+    }
+
+    @Test("Creating into an unknown list throws listNotFound")
+    func fakeCreateReminderUnknownList() async {
+        let reminders = FakeRemindersService()
+        await #expect(throws: RemindersStoreError.listNotFound) {
+            try await reminders.createReminder(title: "x", inListID: "does-not-exist", dueEpoch: nil)
+        }
+    }
+
+    @Test("Fake keeps same-named lists separate")
+    func fakeDuplicateListNames() async throws {
+        let reminders = FakeRemindersService(lists: [
+            ReminderList(id: "a", name: "Work"),
+            ReminderList(id: "b", name: "Work"),
+        ])
+        let one = try await reminders.createReminder(title: "One", inListID: "a", dueEpoch: nil)
+        let two = try await reminders.createReminder(title: "Two", inListID: "b", dueEpoch: nil)
+        let all = try await reminders.fetchAllReminders()
+        #expect(all.count == 2)
+        #expect(all.contains { $0.id == one.id })
+        #expect(all.contains { $0.id == two.id })
+    }
+
+    @Test("Quick capture creates in the selected list with the chosen due date and clears the field")
+    func quickCaptureCreatesReminder() async throws {
+        let harness = try await makeHarness()
+        await harness.state.startup()
+        harness.state.quickCaptureListID = "l-home"
+        harness.state.quickCaptureDueDate = Date().addingTimeInterval(3_600)
+        let expectedEpoch = harness.state.quickCaptureDueDate.timeIntervalSince1970
+        harness.state.quickCaptureText = "Ship the panel"
+        harness.state.quickCapture()
+        for _ in 0..<2_000 {
+            if harness.state.reminderItems.contains(where: { $0.name == "Ship the panel" }) {
+                break
+            }
+            await Task.yield()
+        }
+        #expect(harness.state.quickCaptureText.isEmpty)
+        let matches = harness.state.reminderItems.filter { $0.name == "Ship the panel" }
+        #expect(matches.count == 1)
+        #expect(matches.first?.listName == "Home")
+        #expect(matches.first?.dueEpoch == expectedEpoch)
+    }
+
+    @Test("Quick capture due date defaults to one hour from now and resets after capture")
+    func quickCaptureDueDateDefaultAndReset() async throws {
+        let harness = try await makeHarness()
+        await harness.state.startup()
+        let defaultEpoch = harness.state.quickCaptureDueDate.timeIntervalSince1970
+        #expect(abs(defaultEpoch - Date().timeIntervalSince1970 - 3_600) < 60)
+
+        harness.state.quickCaptureListID = "l-work"
+        harness.state.quickCaptureDueDate = Date().addingTimeInterval(86_400)
+        harness.state.quickCaptureText = "Tomorrow task"
+        harness.state.quickCapture()
+        for _ in 0..<2_000 {
+            if harness.state.reminderItems.contains(where: { $0.name == "Tomorrow task" }) {
+                break
+            }
+            await Task.yield()
+        }
+        let resetEpoch = harness.state.quickCaptureDueDate.timeIntervalSince1970
+        #expect(abs(resetEpoch - Date().timeIntervalSince1970 - 3_600) < 60)
+    }
+
+    @Test("Failed creation keeps the entered text and falls back to the first list")
+    func quickCaptureFailureRetainsText() async throws {
+        let harness = try await makeHarness()
+        await harness.state.startup()
+        harness.state.quickCaptureListID = "does-not-exist"
+        harness.state.quickCaptureText = "Will fail"
+        harness.state.quickCapture()
+        for _ in 0..<2_000 {
+            if !harness.state.isCreatingReminder {
+                break
+            }
+            await Task.yield()
+        }
+        #expect(harness.state.quickCaptureText == "Will fail")
+        #expect(harness.state.quickCaptureListID == "l-work")
+        #expect(harness.state.reminderItems.isEmpty)
     }
 }

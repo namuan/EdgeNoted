@@ -1,11 +1,78 @@
 import SwiftUI
 
-/// Reminders: a unified view of incomplete overdue and today items.
+/// Reminders: a compact add row with list picker above the unified due list.
 struct RemindersSectionView: View {
     @Environment(AppState.self) private var appState
+    @Environment(SettingsStore.self) private var settings
 
     var body: some View {
-        reminderList
+        @Bindable var appState = appState
+        VStack(spacing: 0) {
+            addRow
+            Rectangle()
+                .fill(.secondary.opacity(0.2))
+                .frame(height: 1)
+            reminderList
+        }
+    }
+
+    /// One row: leading status icon, capture field, and a compact list menu.
+    private var addRow: some View {
+        @Bindable var appState = appState
+        return HStack(spacing: 6) {
+            if appState.isCreatingReminder {
+                ProgressView()
+                    .controlSize(.small)
+            } else if let listName = appState.lastCreatedListName {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(settings.activeTheme().accentColor)
+                    .help("Added to \(listName)")
+                    .accessibilityLabel("Added to \(listName)")
+            } else {
+                Image(systemName: "plus.circle")
+                    .foregroundStyle(settings.activeTheme().accentColor)
+            }
+
+            TextField("Add reminder…", text: $appState.quickCaptureText)
+                .textFieldStyle(.plain)
+                .disabled(appState.isCreatingReminder || appState.reminderLists.isEmpty)
+                .onSubmit {
+                    appState.quickCapture()
+                }
+
+            DatePicker("Due", selection: $appState.quickCaptureDueDate)
+                .datePickerStyle(.compact)
+                .labelsHidden()
+                .disabled(appState.isCreatingReminder || appState.reminderLists.isEmpty)
+                .help("Due date (default: one hour from now)")
+
+            Menu {
+                ForEach(appState.reminderLists) { list in
+                    Button {
+                        appState.quickCaptureListID = list.id
+                    } label: {
+                        if list.id == appState.quickCaptureListID {
+                            Label(list.name, systemImage: "checkmark")
+                        } else {
+                            Text(list.name)
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "list.bullet")
+                    Text(appState.selectedQuickCaptureListName)
+                        .lineLimit(1)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .disabled(appState.reminderLists.isEmpty)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
     }
 
     @ViewBuilder

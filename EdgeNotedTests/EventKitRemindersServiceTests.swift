@@ -62,4 +62,11 @@ struct EventKitRemindersServiceTests {
         #expect(RemindersAccessError.accessRestricted.errorDescription?.isEmpty == false)
         #expect(RemindersAccessError.writeOnly.errorDescription?.isEmpty == false)
     }
+
+    @Test("Store errors carry actionable descriptions")
+    func storeErrorDescriptions() {
+        #expect(RemindersStoreError.notFound.errorDescription?.isEmpty == false)
+        #expect(RemindersStoreError.listNotFound.errorDescription?.contains("list") == true)
+        #expect(RemindersStoreError.listNotWritable.errorDescription?.isEmpty == false)
+    }
 }

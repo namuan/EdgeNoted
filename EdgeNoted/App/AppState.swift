@@ -64,9 +64,23 @@ final class AppState {
 
     var reminderLists: [ReminderList] = []
     var reminderItems: [ReminderItem] = []
+    var quickCaptureText = ""
+    var quickCaptureListID: String?
+    /// Due date for the next captured reminder; defaults to one hour from now.
+    var quickCaptureDueDate = Date().addingTimeInterval(3_600)
+    var isCreatingReminder = false
+    /// Set briefly after a successful capture so the row can confirm the target list.
+    var lastCreatedListName: String?
 
     var displayedReminderItems: [ReminderItem] {
         reminderItems.filter { $0.isDueTodayOrOverdue() }
+    }
+
+    /// Name shown on the capture row's list picker.
+    var selectedQuickCaptureListName: String {
+        reminderLists.first(where: { $0.id == quickCaptureListID })?.name
+            ?? reminderLists.first?.name
+            ?? "List"
     }
 
     // MARK: Private state
@@ -74,6 +88,7 @@ final class AppState {
     private var sync = NoteDraftSync()
     private var pollTask: Task<Void, Never>?
     private var reminderReloadTask: Task<Void, Never>?
+    private var captureConfirmationTask: Task<Void, Never>?
     private var saveDebouncer: Debouncer?
     private var lastRemoteMtime: TimeInterval?
     /// The note id with unsaved edits, so a pending save survives switching
@@ -149,6 +164,7 @@ final class AppState {
             await loadConfiguredNote()
             let loadedReminderLists = try await loadedLists
             reminderLists = loadedReminderLists
+            reconcileQuickCaptureList()
             // Re-home any local metadata that still uses folder names as keys.
             MetaStore.migrateFolderNameKeys(loadedFolders, in: modelContainer.mainContext)
             await loadAllReminders()
@@ -530,6 +546,58 @@ final class AppState {
         await loadAllReminders()
     }
 
+    /// Creates a reminder in the chosen list from the capture field. Keeps the
+    /// entered text on failure so nothing is lost; clears it only on success.
+    func quickCapture() {
+        let text = quickCaptureText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !isCreatingReminder else { return }
+        guard let listID = quickCaptureListID ?? reminderLists.first?.id else { return }
+        isCreatingReminder = true
+        Log.info(
+            "Reminder quick capture",
+            category: .reminders,
+            metadata: ["listId": Log.digest(listID)]
+        )
+        Task {
+            do {
+                let created = try await reminders.createReminder(
+                    title: text,
+                    inListID: listID,
+                    dueEpoch: quickCaptureDueDate.timeIntervalSince1970
+                )
+                // The EKEventStoreChanged notification may already have reloaded
+                // this item, so avoid inserting a duplicate.
+                if !reminderItems.contains(where: { $0.id == created.id }) {
+                    reminderItems.insert(created, at: 0)
+                }
+                quickCaptureText = ""
+                quickCaptureDueDate = Date().addingTimeInterval(3_600)
+                lastCreatedListName = created.listName
+                captureConfirmationTask?.cancel()
+                captureConfirmationTask = Task { [weak self] in
+                    try? await Task.sleep(for: .seconds(2))
+                    guard !Task.isCancelled else { return }
+                    self?.lastCreatedListName = nil
+                }
+            } catch {
+                handleServiceError(error)
+                if let storeError = error as? RemindersStoreError, storeError == .listNotFound {
+                    // The chosen list disappeared; reload lists and fall back.
+                    await reloadRemindersFromExternalChange()
+                }
+            }
+            isCreatingReminder = false
+        }
+    }
+
+    /// Keeps the capture destination valid as lists load or change.
+    private func reconcileQuickCaptureList() {
+        if let quickCaptureListID, reminderLists.contains(where: { $0.id == quickCaptureListID }) {
+            return
+        }
+        quickCaptureListID = reminderLists.first?.id
+    }
+
     /// Registers for external Reminders changes when the service supports it.
     /// External edits (including new due dates) refresh the panel automatically.
     private func subscribeToReminderChanges() async {
@@ -556,6 +624,7 @@ final class AppState {
     private func reloadRemindersFromExternalChange() async {
         do {
             reminderLists = try await reminders.fetchLists()
+            reconcileQuickCaptureList()
             await loadAllReminders()
         } catch {
             handleServiceError(error)
