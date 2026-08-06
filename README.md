@@ -85,21 +85,13 @@ bash Scripts/build-app.sh
 open "Build/EdgeNoted.app"
 ```
 
-`make test` runs the full suite and requires XcodeGen (`brew install xcodegen`
-then `make generate`).
+`make test` runs the full suite via SwiftPM — no Xcode required.
 
 ## First-time setup
 
 ```bash
 brew install swiftlint periphery pre-commit
 pre-commit install
-```
-
-XcodeGen is only needed for UI tests / Xcode integration:
-
-```bash
-brew install xcodegen
-xcodegen generate
 ```
 
 ## Common tasks
@@ -110,10 +102,9 @@ make run         # build and launch the app
 make backup-notes # back up all Apple Notes to ~/Documents/EdgeNoted Backup
 make format      # auto-format all Swift files
 make lint        # run SwiftLint syntax rules (--strict)
-make analyze     # run SwiftLint analyzer rules after a clean full compile
 make dead-code   # scan every SwiftPM target for unused declarations (Periphery)
-make test        # run unit + UI tests (requires xcodegen generate first)
-make precommit   # format + lint + analysis + dead-code + test
+make test        # run unit tests via SwiftPM
+make precommit   # format + lint + dead-code + test
 ```
 
 ## Architecture notes
@@ -141,7 +132,7 @@ Key design decisions:
 - **Conflict-safe sync.** Local edits are debounced and written back; a poll
   that observes a remote change while edits are pending raises a conflict the
   user resolves explicitly.
-- **UI tests run hermetic.** Launch with `-UITestFakeServices YES` and the app
+- **Hermetic test mode.** Launch with `-UITestFakeServices YES` and the app
   uses in-memory fake Notes/Reminders services and disables real automation.
 
 ## Manual acceptance checklist

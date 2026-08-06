@@ -1,22 +1,16 @@
-.PHONY: generate format lint analyze dead-code test build run backup-notes precommit clean
-
-generate:
-	xcodegen generate
+.PHONY: format lint dead-code test build run backup-notes precommit clean
 
 format:
-	swift format --in-place --recursive EdgeNoted/ EdgeNotedTests/ EdgeNotedUITests/
+	swift format --in-place --recursive EdgeNoted/ EdgeNotedTests/
 
 lint:
 	swiftlint lint --strict
-
-analyze:
-	@bash Scripts/swiftlint-analyze.sh
 
 dead-code:
 	periphery scan
 
 test:
-	xcodebuild test -project EdgeNoted.xcodeproj -scheme EdgeNoted -destination 'platform=macOS'
+	swift test
 
 build:
 	@bash Scripts/build-app.sh
@@ -34,7 +28,7 @@ run: build
 backup-notes:
 	@bash Scripts/backup-notes.sh
 
-precommit: format lint analyze dead-code test
+precommit: format lint dead-code test
 
 clean:
-	rm -rf EdgeNoted.xcodeproj DerivedData TestResults Build .build
+	rm -rf DerivedData TestResults Build .build

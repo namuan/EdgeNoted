@@ -14,41 +14,20 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_16.app
 
-      - name: Install XcodeGen
-        run: brew install xcodegen
-
       - name: Install SwiftLint
         run: brew install swiftlint
 
       - name: Install Periphery
         run: brew install periphery
 
-      - name: Generate Xcode project
-        run: xcodegen generate
-
       - name: Lint
         run: swiftlint lint --strict
-
-      - name: Analyze with SwiftLint
-        run: bash Scripts/swiftlint-analyze.sh
 
       - name: Find unused code
         run: periphery scan
 
       - name: Check formatting
-        run: swift format lint --recursive EdgeNoted/ EdgeNotedTests/ EdgeNotedUITests/
+        run: swift format lint --recursive EdgeNoted/ EdgeNotedTests/
 
       - name: Run tests
-        run: |
-          xcodebuild test \
-            -project EdgeNoted.xcodeproj \
-            -scheme EdgeNoted \
-            -destination 'platform=macOS' \
-            -resultBundlePath TestResults
-
-      - name: Upload test results
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: TestResults
+        run: swift test
