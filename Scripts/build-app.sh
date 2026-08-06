@@ -37,6 +37,8 @@ cat > "$APP_BUNDLE/Contents/Info.plist" <<EOF
     <string>6.0</string>
     <key>CFBundleName</key>
     <string>$APP_NAME</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -63,7 +65,10 @@ if [ -d "$APP_NAME/Resources/Assets.xcassets" ] && [ "$(ls -A "$APP_NAME/Resourc
     xcrun actool "$APP_NAME/Resources/Assets.xcassets" \
         --compile "$APP_BUNDLE/Contents/Resources" \
         --platform macosx \
-        --minimum-deployment-target 14.0
+        --minimum-deployment-target 14.0 \
+        --app-icon AppIcon \
+        --target-device mac \
+        --output-partial-info-plist "$APP_BUNDLE/Contents/Resources/partial.plist"
 fi
 
 # Copy remaining resources (excluding .xcassets which was compiled)
