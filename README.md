@@ -1,4 +1,8 @@
-# EdgeNoted
+<p align="center">
+  <img src="assets/icon.png" width="128" height="128" alt="EdgeNoted icon">
+</p>
+
+<h1 align="center">EdgeNoted</h1>
 
 A lightweight, always-available macOS companion for your **Apple Notes** and
 **Apple Reminders**. EdgeNoted slides in from the edge of your screen, lets you
