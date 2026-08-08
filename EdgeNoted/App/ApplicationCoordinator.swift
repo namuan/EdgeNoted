@@ -102,6 +102,10 @@ final class ApplicationCoordinator {
 
     func openSettings() {
         Log.info("Settings requested", category: .settings)
+        // The edge panel floats at the status-bar window level, which is above
+        // the settings window. Dismiss it first so the settings never open
+        // underneath the always-on-top panel.
+        hidePanel()
         let window: NSWindow
         if let existing = settingsWindow {
             window = existing
