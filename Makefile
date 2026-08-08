@@ -1,4 +1,4 @@
-.PHONY: format lint dead-code test build run backup-notes precommit clean
+.PHONY: format lint dead-code test build install run backup-notes precommit clean
 
 format:
 	swift format --in-place --recursive EdgeNoted/ EdgeNotedTests/
@@ -23,6 +23,10 @@ run: build
 	for i in $$(seq 1 50); do pgrep -x EdgeNoted >/dev/null || break; sleep 0.1; done; \
 	pgrep -x EdgeNoted >/dev/null && { echo "EdgeNoted did not quit in time" >&2; exit 1; }; \
 	open "Build/EdgeNoted.app"
+
+# Build and install the app bundle into ~/Applications
+install:
+	@bash install.command
 
 # Back up every Apple Notes note to ~/Documents/EdgeNoted Backup/<timestamp>/
 backup-notes:

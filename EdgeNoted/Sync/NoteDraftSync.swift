@@ -1,4 +1,4 @@
-/// What a poll observed on the remote (Apple Notes) side.
+/// What the remote (Apple Notes) side reports when observed.
 enum RemoteEvent: Equatable, Sendable {
     case noChange
     /// The remote changed while the local draft was clean; safe to adopt.
@@ -81,7 +81,8 @@ struct NoteDraftSync: Equatable, Sendable {
         }
     }
 
-    /// Called when a poll observes remote content.
+    /// Called when remote content is observed (note open, startup, manual
+    /// sync from Apple Notes).
     mutating func observeRemote(body: String) -> RemoteEvent {
         let remoteHash = Self.hash(of: body)
         switch state {

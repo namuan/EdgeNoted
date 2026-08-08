@@ -4,7 +4,7 @@ import Observation
 import SwiftData
 
 /// Central observable state for the panel UI. Owns the selected note/reminder,
-/// the editor draft, and the synchronization loop with Apple Notes.
+/// the editor draft, and sync with Apple Notes (one-way writes, pull on demand).
 @MainActor
 @Observable
 final class AppState {
@@ -39,6 +39,8 @@ final class AppState {
     var isPanelVisible = false
     var activeSection: Section = .notes
     var isLoading = false
+    /// True while the panel's manual "sync from Apple Notes" pull is running.
+    var isSyncing = false
     var statusMessage: String?
     var automationDenied = false
     var automationError: String?
@@ -86,7 +88,6 @@ final class AppState {
     // MARK: Private state
 
     private var sync = NoteDraftSync()
-    private var pollTask: Task<Void, Never>?
     private var reminderReloadTask: Task<Void, Never>?
     private var captureConfirmationTask: Task<Void, Never>?
     private var saveDebouncer: Debouncer?
@@ -161,7 +162,15 @@ final class AppState {
             async let loadedLists = loadReminderListsWithLaunchRetry()
             let loadedFolders = try await loadNotesFoldersWithLaunchRetry()
             folders = loadedFolders
+            // One-time Apple Notes -> EdgeNoted sync at startup: loading the
+            // configured note always fetches the latest remote body.
             await loadConfiguredNote()
+            if settings.configuredNoteID != nil {
+                Log.info(
+                    "Startup sync: configured note pulled from Apple Notes",
+                    category: .sync
+                )
+            }
             let loadedReminderLists = try await loadedLists
             reminderLists = loadedReminderLists
             reconcileQuickCaptureList()
@@ -260,7 +269,6 @@ final class AppState {
             draftBody = ""
             noteIsReadOnly = false
             sync = NoteDraftSync()
-            pollTask?.cancel()
             return
         }
         await openNote(targetID)
@@ -291,7 +299,6 @@ final class AppState {
             draftBody = ""
             noteIsReadOnly = false
             sync = NoteDraftSync()
-            pollTask?.cancel()
             return
         }
         Task { await openNote(id) }
@@ -318,7 +325,8 @@ final class AppState {
             sync.load(remoteBody: displayBody)
             lastSavedAt = Date()
             markOpened(detail)
-            startPolling()
+            // No periodic polling: Apple Notes -> EdgeNoted sync happens once on
+            // open (startup / note switch) and on demand via the sync button.
             Log.info(
                 "Note opened",
                 category: .notes,
@@ -453,23 +461,23 @@ final class AppState {
         await saveNoteNow(force: true)
     }
 
-    private func startPolling() {
-        pollTask?.cancel()
-        let interval = max(settings.pollInterval, 1.0)
-        pollTask = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(interval))
-                guard !Task.isCancelled, let self else { return }
-                if self.isPanelVisible || self.sync.isDirty {
-                    await self.pollSelectedNote()
-                }
-            }
-        }
+    /// One-shot pull of the displayed note from Apple Notes, triggered by the
+    /// panel's sync button. Remote changes never silently overwrite local
+    /// edits: if the draft is dirty and the remote changed, the conflict
+    /// banner lets the user decide (Keep Mine / Take Theirs / Open in Notes).
+    func syncFromNotesNow() async {
+        guard selectedNoteID != nil, !isSyncing else { return }
+        isSyncing = true
+        await pullFromAppleNotes()
+        isSyncing = false
     }
 
-    /// Polls the selected note for remote changes. Internal so tests can drive
-    /// it directly instead of waiting for the timer.
-    func pollSelectedNote() async {
+    /// Fetches the displayed note from Apple Notes and folds remote changes
+    /// into the draft. This is the only Apple Notes -> EdgeNoted sync path:
+    /// a one-time pull when a note is opened (startup / note switch) and an
+    /// on-demand pull from the sync button. Internal so tests can drive it
+    /// directly.
+    func pullFromAppleNotes() async {
         guard let noteID = selectedNoteID else { return }
         do {
             let detail = try await notes.fetchNote(id: noteID)
@@ -513,8 +521,10 @@ final class AppState {
                 )
             }
         } catch {
-            // Transient script failures are ignored; the next poll retries.
-            Log.warning("Note poll failed (will retry)", category: .sync, metadata: ["noteId": noteID])
+            // A manual pull has no retry loop; surface the error so the user
+            // can act (e.g. grant automation permission) and try again.
+            Log.warning("Note sync failed", category: .sync, metadata: ["noteId": noteID])
+            handleServiceError(error)
         }
     }
 

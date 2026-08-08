@@ -17,10 +17,11 @@ view and edit a single note instantly, and hides again — no app switching.
   - Global keyboard shortcut (default `⌃⇧N`, configurable)
   - Click the thin "Open Bar" strip at the screen edge
   - Hot Side: touch the chosen screen edge with the mouse
-- **Apple Notes, bidirectional.** EdgeNoted does not store your notes. It lists
-  your folders and notes, opens one note at a time, and writes your edits
-  straight back to Apple Notes. External edits made in Notes are picked up by
-  polling; if you are editing when the remote note changes, you choose
+- **Apple Notes, one-way writes (pull on demand).** EdgeNoted does not store
+  your notes. It lists your folders and notes, opens one note at a time, and
+  writes your edits straight back to Apple Notes. Changes made in Apple Notes
+  are pulled in once at startup and whenever you press the sync button in the
+  panel; if you are editing when the remote note changes, you choose
   Keep Mine / Take Theirs / Open in Notes — nothing is overwritten silently.
 - **Apple Reminders.** Browse lists, view/create/edit/complete reminders, set
   due dates and priorities, and quick-capture new ones.
@@ -56,6 +57,7 @@ Store anyway, a non-sandboxed build is the correct trade-off.
 ```bash
 make build       # compile with SwiftPM + create Build/EdgeNoted.app (signed)
 make run         # build (if needed) and launch the app
+make install     # build + install into ~/Applications (or double-click install.command)
 ```
 
 ## Backing up your notes
@@ -133,9 +135,9 @@ Key design decisions:
   come back as JSON.
 - **Apple Notes stays the source of truth.** Only opaque IDs and presentation
   preferences are stored locally (SwiftData). Note bodies are never persisted.
-- **Conflict-safe sync.** Local edits are debounced and written back; a poll
-  that observes a remote change while edits are pending raises a conflict the
-  user resolves explicitly.
+- **Conflict-safe sync.** Local edits are debounced and written back; a pull
+  (startup or the panel's sync button) that observes a remote change while
+  edits are pending raises a conflict the user resolves explicitly.
 - **Hermetic test mode.** Launch with `-UITestFakeServices YES` and the app
   uses in-memory fake Notes/Reminders services and disables real automation.
 
@@ -146,8 +148,8 @@ After building, verify with disposable content:
 1. First launch: approve the automation prompt for Notes and Reminders.
 2. Hotkey, Open Bar click, and Hot Side each show/hide the panel exactly once.
 3. Create/edit a text-only note in EdgeNoted and confirm it in Apple Notes;
-   edit the same note in Notes and confirm the change is adopted (or a conflict
-   banner appears if you were editing).
+   edit the same note in Notes and confirm the change is adopted after pressing
+   the sync button (or a conflict banner appears if you were editing).
 4. Create/edit/complete a reminder and set a due date and priority.
 5. Export a note as a PNG and confirm the image renders.
 

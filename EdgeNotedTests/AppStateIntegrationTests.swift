@@ -130,16 +130,29 @@ struct AppStateIntegrationTests {
         #expect(harness.state.lastSavedAt != nil)
     }
 
-    @Test("External edits are adopted when the draft is clean")
+    @Test("Manual pull adopts external edits when the draft is clean")
     func externalEditAdopted() async throws {
         let harness = try await makeHarness()
         await harness.state.startup()
         harness.state.selectNote("n1")
         await waitForNoteOpen(harness.state)
         await harness.notes.simulateExternalEdit(id: "n1", name: "Meeting (updated)", body: "New agenda")
-        await harness.state.pollSelectedNote()
+        await harness.state.pullFromAppleNotes()
         #expect(harness.state.draftBody == "New agenda")
         #expect(harness.state.conflict == nil)
+    }
+
+    @Test("Manual sync button pulls remote changes when clean")
+    func manualSyncAdoptsRemoteChanges() async throws {
+        let harness = try await makeHarness()
+        await harness.state.startup()
+        harness.state.selectNote("n1")
+        await waitForNoteOpen(harness.state)
+        await harness.notes.simulateExternalEdit(id: "n1", name: "Meeting", body: "Edited in Notes")
+        await harness.state.syncFromNotesNow()
+        #expect(harness.state.draftBody == "Edited in Notes")
+        #expect(harness.state.conflict == nil)
+        #expect(!harness.state.isSyncing)
     }
 
     @Test("External edits while editing raise a conflict, not data loss")
@@ -151,7 +164,7 @@ struct AppStateIntegrationTests {
         harness.state.draftBody = "My local changes"
         harness.state.bodyChanged()
         await harness.notes.simulateExternalEdit(id: "n1", name: "Meeting", body: "Their changes")
-        await harness.state.pollSelectedNote()
+        await harness.state.pullFromAppleNotes()
         #expect(harness.state.conflict != nil)
         // Keep mine wins and pushes local over remote.
         harness.state.resolveConflictKeepMine()
@@ -218,7 +231,7 @@ struct AppStateIntegrationTests {
         harness.state.selectNote("n1")
         await waitForNoteOpen(harness.state)
         await harness.notes.simulateExternalEdit(id: "n1", name: "Renamed in Notes", body: "Discuss roadmap")
-        await harness.state.pollSelectedNote()
+        await harness.state.pullFromAppleNotes()
         #expect(harness.state.draftTitle == "Renamed in Notes")
         #expect(harness.state.draftBody == "Discuss roadmap")
     }

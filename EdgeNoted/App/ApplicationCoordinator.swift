@@ -149,7 +149,6 @@ final class ApplicationCoordinator {
                 "hotSide": String(settings.hotSideEnabled),
                 "hotKey": settings.hotKeyDescription,
                 "panel": "\(Int(settings.panelWidth))x\(Int(settings.panelHeight))",
-                "pollInterval": String(settings.pollInterval),
             ]
         )
     }

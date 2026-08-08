@@ -57,6 +57,19 @@ struct NoteEditorView: View {
             Spacer()
 
             Button {
+                Task { await appState.syncFromNotesNow() }
+            } label: {
+                if appState.isSyncing {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                }
+            }
+            .help("Sync from Apple Notes (pull latest changes)")
+            .disabled(appState.isSyncing)
+
+            Button {
                 appState.openSelectedNoteInNotes()
             } label: {
                 Image(systemName: "arrow.up.forward.app")

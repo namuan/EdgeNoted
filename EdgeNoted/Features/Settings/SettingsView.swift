@@ -57,16 +57,6 @@ private struct GeneralSettingsTab: View {
                     Slider(value: $settings.panelWidth, in: 320...700, step: 10)
                         .frame(width: 160)
                 }
-                LabeledContent("Sync check every") {
-                    Picker("", selection: $settings.pollInterval) {
-                        Text("2 s").tag(2.0)
-                        Text("5 s").tag(5.0)
-                        Text("10 s").tag(10.0)
-                        Text("30 s").tag(30.0)
-                    }
-                    .labelsHidden()
-                    .fixedSize()
-                }
             }
             Section {
                 Toggle("Launch at login", isOn: $settings.launchAtLogin)
@@ -425,7 +415,8 @@ private struct AboutSettingsTab: View {
             }
             Text(
                 "A lightweight, always-available companion for your Apple Notes and Reminders. "
-                    + "Notes are edited directly in Apple Notes with bidirectional sync; local data "
+                    + "Edits are written straight into Apple Notes (one-way); changes made in Notes "
+                    + "are pulled in at startup and via the panel's sync button. Local data "
                     + "is limited to presentation preferences (pins, order, colors, themes, snippets)."
             )
             .font(.callout)

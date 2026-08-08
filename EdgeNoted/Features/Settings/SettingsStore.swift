@@ -18,7 +18,6 @@ final class SettingsStore {
         static let hotSideThreshold = "hotSideThreshold"
         static let hotSideArmDelay = "hotSideArmDelay"
         static let autoHideDelay = "autoHideDelay"
-        static let pollInterval = "pollInterval"
         static let panelWidth = "panelWidth"
         static let panelHeight = "panelHeight"
         static let panelMargin = "panelMargin"
@@ -74,10 +73,6 @@ final class SettingsStore {
 
     var autoHideDelay: Double {
         didSet { defaults.set(autoHideDelay, forKey: Keys.autoHideDelay) }
-    }
-
-    var pollInterval: Double {
-        didSet { defaults.set(pollInterval, forKey: Keys.pollInterval) }
     }
 
     // MARK: Panel
@@ -159,7 +154,6 @@ final class SettingsStore {
         hotSideThreshold = defaults.object(forKey: Keys.hotSideThreshold) as? Double ?? 8
         hotSideArmDelay = defaults.object(forKey: Keys.hotSideArmDelay) as? Double ?? 0.12
         autoHideDelay = defaults.object(forKey: Keys.autoHideDelay) as? Double ?? 2.0
-        pollInterval = defaults.object(forKey: Keys.pollInterval) as? Double ?? 5.0
         panelWidth = defaults.object(forKey: Keys.panelWidth) as? Double ?? 460
         panelHeight = defaults.object(forKey: Keys.panelHeight) as? Double ?? 600
         panelMargin = defaults.object(forKey: Keys.panelMargin) as? Double ?? 0
