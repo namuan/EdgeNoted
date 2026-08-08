@@ -73,6 +73,16 @@ private struct GeneralSettingsTab: View {
                         }
                     }
             }
+            Section {
+                Button("Quit EdgeNoted", role: .destructive) {
+                    appState.coordinator?.requestQuit()
+                }
+            } footer: {
+                Text(
+                    "EdgeNoted runs in the background with no Dock or menu bar icon, so "
+                        + "this (or the panel's power button) is how you exit the app."
+                )
+            }
         }
         .formStyle(.grouped)
         .onDisappear {

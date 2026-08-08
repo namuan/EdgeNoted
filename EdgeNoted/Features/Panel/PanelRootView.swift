@@ -73,6 +73,13 @@ private struct PanelHeaderView: View {
                     Image(systemName: "chevron.right")
                 }
                 .help("Hide (Esc)")
+
+                Button {
+                    appState.coordinator?.requestQuit()
+                } label: {
+                    Image(systemName: "power")
+                }
+                .help("Quit EdgeNoted")
             }
             .padding(.horizontal, 12)
             .padding(.top, 10)

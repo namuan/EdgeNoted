@@ -29,6 +29,9 @@ view and edit a single note instantly, and hides again — no app switching.
 - **Extras:** color-code preview (`#rrggbb`/`#rgb` swatches), interactive
   checklists (`- [ ]` / `- [x]`).
 - **Keyboard-first:** `⌘N` new note, `Esc` hide, all actions keyboard-accessible.
+- **Quit built in.** No Dock or menu bar icon (by design), so quitting is
+  explicit: the panel's power button or Settings > General > Quit EdgeNoted.
+  Unsaved edits are flushed to Apple Notes first.
 - **File logging.** Diagnostics are written to rolling files in
   `~/Library/Logs/EdgeNoted/` (`EdgeNoted.log` rotating to `EdgeNoted-1.log` …
   `EdgeNoted-5.log` at ~1 MB each). Note bodies, titles, and reminder contents

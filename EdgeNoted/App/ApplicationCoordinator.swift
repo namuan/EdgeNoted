@@ -153,6 +153,35 @@ final class ApplicationCoordinator {
         )
     }
 
+    // MARK: - Quit
+
+    /// The only in-app way to exit: EdgeNoted has no Dock icon and no menu bar
+    /// icon, so the system's usual quit affordances do not exist. Asks for
+    /// confirmation (the panel sits at the screen edge where misclicks are
+    /// easy), then flushes unsaved edits and terminates.
+    func requestQuit() {
+        let alert = NSAlert()
+        alert.messageText = "Quit EdgeNoted?"
+        alert.informativeText = "Unsaved edits will be written to Apple Notes before quitting."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Quit")
+        alert.addButton(withTitle: "Cancel")
+        if alert.runModal() == .alertFirstButtonReturn {
+            quit()
+        }
+    }
+
+    /// Flushes the debounced note save so edits made in the panel land in
+    /// Apple Notes, then terminates the app.
+    func quit() {
+        Log.info("Quit requested", category: .lifecycle)
+        Task { [weak self] in
+            guard let self else { return }
+            await self.appState.flushPendingSave()
+            NSApp.terminate(nil)
+        }
+    }
+
     private func registerHotKey() {
         Log.info(
             "Registering global hotkey",
