@@ -49,10 +49,12 @@ enum NoteBodyClassifier {
     /// Converts the editor's plain text into structural HTML that Apple Notes
     /// preserves when assigned through AppleScript.
     static func htmlForWriting(_ body: String) -> String {
-        let normalizedBody = body
+        let normalizedBody =
+            body
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
-        return normalizedBody
+        return
+            normalizedBody
             .split(separator: "\n", omittingEmptySubsequences: false)
             .map { line in
                 line.isEmpty ? "<div><br></div>" : "<div>\(escapedForHTML(String(line)))</div>"
@@ -70,7 +72,8 @@ enum NoteBodyClassifier {
             with: emptyLineToken,
             options: [.regularExpression, .caseInsensitive]
         )
-        let textWithLineBreaks = textWithEmptyLineTokens
+        let textWithLineBreaks =
+            textWithEmptyLineTokens
             .replacingOccurrences(
                 of: #"<\s*br\s*/?\s*>"#,
                 with: "\n",

@@ -1,5 +1,5 @@
-import Foundation
 @preconcurrency import EventKit
+import Foundation
 
 /// Pure mapping helpers shared with tests. No EventKit types cross these
 /// boundaries, so they stay unit-testable without touching the user's store.
@@ -83,7 +83,8 @@ actor EventKitRemindersService: RemindersService, RemindersChangeObserving {
         // Only writable lists can accept new reminders; read-only smart lists
         // are still surfaced by fetchAllReminders for display.
         let calendars = store().calendars(for: .reminder).filter(\.allowsContentModifications)
-        return calendars
+        return
+            calendars
             .map { ReminderList(id: $0.calendarIdentifier, name: $0.title) }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }

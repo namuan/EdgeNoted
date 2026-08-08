@@ -144,6 +144,15 @@ final class AppleScriptNotesService: NotesService, @unchecked Sendable {
 
 /// In-memory NotesService used by unit tests and UI tests. No Apple Events.
 actor FakeNotesService: NotesService {
+    /// One pre-seeded note, declared as a struct so UI-test launch code can
+    /// seed the fake from a synchronous context without awaiting the actor.
+    struct Seed: Sendable {
+        let id: String
+        let name: String
+        let body: String
+        let folderName: String?
+    }
+
     private struct StoredNote: Sendable {
         var name: String
         var body: String
@@ -163,11 +172,23 @@ actor FakeNotesService: NotesService {
         folders: [NotesFolder] = [
             NotesFolder(id: "f-work", name: "Work"),
             NotesFolder(id: "f-personal", name: "Personal"),
-        ]
+        ],
+        seed: [Seed] = []
     ) {
         self.folders = folders
         self.store = [:]
         self.nextEpochValue = 1_000_000
+        // Seeding in the initializer lets a synchronous main-actor context
+        // (app launch) build a pre-populated fake without an await.
+        for item in seed {
+            nextEpochValue += 1
+            store[item.id] = StoredNote(
+                name: item.name,
+                body: item.body,
+                folderName: item.folderName,
+                modificationEpoch: nextEpochValue
+            )
+        }
     }
 
     private func nextEpoch() -> TimeInterval {

@@ -41,11 +41,13 @@ struct ReminderItem: Identifiable, Hashable, Sendable {
     /// Whether this incomplete reminder belongs in the overdue-and-today panel.
     func isDueTodayOrOverdue(referenceDate: Date = .now, calendar: Calendar = .current) -> Bool {
         guard !isCompleted, let dueEpoch else { return false }
-        guard let startOfTomorrow = calendar.date(
-            byAdding: .day,
-            value: 1,
-            to: calendar.startOfDay(for: referenceDate)
-        ) else { return false }
+        guard
+            let startOfTomorrow = calendar.date(
+                byAdding: .day,
+                value: 1,
+                to: calendar.startOfDay(for: referenceDate)
+            )
+        else { return false }
         return Date(timeIntervalSince1970: dueEpoch) < startOfTomorrow
     }
 }
@@ -70,7 +72,7 @@ protocol RemindersService: Sendable {
 
 /// Optional capability for services that can observe external Reminders
 /// changes. AppState subscribes when the concrete service supports it.
-protocol RemindersChangeObserving: AnyObject {
+protocol RemindersChangeObserving: AnyObject, Sendable {
     func setChangeHandler(_ handler: (@Sendable () -> Void)?) async
 }
 
@@ -99,6 +101,14 @@ enum RemindersAccessError: LocalizedError, Equatable {
 
 /// In-memory RemindersService used by unit tests and UI tests.
 actor FakeRemindersService: RemindersService {
+    /// One pre-seeded reminder, declared as a struct so UI-test launch code
+    /// can seed the fake from a synchronous context without awaiting the actor.
+    struct Seed: Sendable {
+        let name: String
+        let listName: String
+        let isCompleted: Bool
+    }
+
     private struct StoredReminder: Sendable {
         var name: String
         var isCompleted: Bool
@@ -114,10 +124,23 @@ actor FakeRemindersService: RemindersService {
         lists: [ReminderList] = [
             ReminderList(id: "l-work", name: "Work"),
             ReminderList(id: "l-home", name: "Home"),
-        ]
+        ],
+        seed: [Seed] = []
     ) {
         self.lists = lists
         self.store = Dictionary(uniqueKeysWithValues: lists.map { ($0.id, [:]) })
+        // Seeding in the initializer lets a synchronous main-actor context
+        // (app launch) build a pre-populated fake without an await.
+        for item in seed {
+            guard let listID = lists.first(where: { $0.name == item.listName })?.id else { continue }
+            let id = "fake-reminder-\(abs(item.name.hashValue))"
+            store[listID]?[id] = StoredReminder(
+                name: item.name,
+                isCompleted: item.isCompleted,
+                dueEpoch: nil,
+                priority: 0
+            )
+        }
     }
 
     func seed(name: String, listName: String, isCompleted: Bool = false) {

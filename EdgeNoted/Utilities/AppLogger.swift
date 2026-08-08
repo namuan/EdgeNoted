@@ -107,7 +107,6 @@ actor AppLogger {
         metadata: [String: String] = [:]
     ) async {
         await setupIfNeeded()
-        guard let handle else { return }
 
         let line = Self.formattedLine(
             level: level,
@@ -161,7 +160,7 @@ actor AppLogger {
         }
         handle = try? FileHandle(forWritingTo: currentFileURL)
         if let handle {
-            currentSize = (try? handle.seekToEndOfFile()) ?? 0
+            currentSize = handle.seekToEndOfFile()
         }
         // Only the production logger announces itself, so test loggers with
         // their own directories never write into the real log.

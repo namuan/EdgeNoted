@@ -38,22 +38,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let reminders: any RemindersService
 
         if useFakes {
-            let fakeNotes = FakeNotesService()
-            fakeNotes.seed(
-                id: "seed-1",
-                name: "Welcome to EdgeNoted",
-                body: "Edit this note - changes sync to Apple Notes.",
-                folderName: nil
-            )
-            fakeNotes.seed(
-                id: "seed-2",
-                name: "Shopping",
-                body: "- [ ] Milk\n- [x] Coffee\n- [ ] #E5484D hex colors render as swatches",
-                folderName: nil
-            )
-            let fakeReminders = FakeRemindersService()
-            fakeReminders.seed(name: "Call the dentist", listName: "Home")
-            fakeReminders.seed(name: "File expenses", listName: "Work")
+            let fakeNotes = FakeNotesService(seed: [
+                FakeNotesService.Seed(
+                    id: "seed-1",
+                    name: "Welcome to EdgeNoted",
+                    body: "Edit this note - changes sync to Apple Notes.",
+                    folderName: nil
+                ),
+                FakeNotesService.Seed(
+                    id: "seed-2",
+                    name: "Shopping",
+                    body: "- [ ] Milk\n- [x] Coffee\n- [ ] #E5484D hex colors render as swatches",
+                    folderName: nil
+                ),
+            ])
+            let fakeReminders = FakeRemindersService(seed: [
+                FakeRemindersService.Seed(name: "Call the dentist", listName: "Home", isCompleted: false),
+                FakeRemindersService.Seed(name: "File expenses", listName: "Work", isCompleted: false),
+            ])
             notes = fakeNotes
             reminders = fakeReminders
         } else {
