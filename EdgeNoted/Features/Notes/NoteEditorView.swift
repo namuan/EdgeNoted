@@ -50,6 +50,7 @@ struct NoteEditorView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .frame(width: 124)
+                .focusEffectDisabled()
             }
             Spacer()
 
@@ -67,6 +68,7 @@ struct NoteEditorView: View {
             }
             .help("Sync from Apple Notes")
             .disabled(appState.isSyncing)
+            .focusEffectDisabled()
 
             Button {
                 appState.openSelectedNoteInNotes()
@@ -75,6 +77,7 @@ struct NoteEditorView: View {
                     .labelStyle(.iconOnly)
             }
             .help("Open in Apple Notes")
+            .focusEffectDisabled()
         }
         .controlSize(.small)
         .padding(.horizontal, 16)

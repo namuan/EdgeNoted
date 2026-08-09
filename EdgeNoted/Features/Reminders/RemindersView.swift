@@ -47,6 +47,7 @@ struct RemindersSectionView: View {
                                 .controlSize(.small)
                         }
                     }
+                    .focusEffectDisabled()
             }
 
             HStack(spacing: 6) {
@@ -58,6 +59,7 @@ struct RemindersSectionView: View {
                     .labelsHidden()
                     .disabled(appState.isCreatingReminder || appState.reminderLists.isEmpty)
                     .help("Due date (default: one hour from now)")
+                    .focusEffectDisabled()
                 if let listName = appState.lastCreatedListName {
                     Spacer()
                     Label("Added to \(listName)", systemImage: "checkmark.circle.fill")
@@ -90,6 +92,7 @@ struct RemindersSectionView: View {
         }
         .menuStyle(.borderlessButton)
         .disabled(appState.reminderLists.isEmpty)
+        .focusEffectDisabled()
     }
 
     @ViewBuilder
@@ -136,6 +139,7 @@ private struct ReminderRow: View {
             }
             .buttonStyle(.plain)
             .help(item.isCompleted ? "Mark incomplete" : "Complete")
+            .focusEffectDisabled()
 
             VStack(alignment: .leading, spacing: 2) {
                 TextField("Reminder", text: $draftName)
@@ -223,6 +227,7 @@ private struct ReminderRow: View {
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
+            .focusEffectDisabled()
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 16)

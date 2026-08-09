@@ -37,6 +37,7 @@ struct NoteBodyPreviewView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .focusEffectDisabled()
         } else if line.isEmpty {
             Spacer()
                 .frame(height: 4)

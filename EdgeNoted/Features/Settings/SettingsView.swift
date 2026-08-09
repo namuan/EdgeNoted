@@ -123,6 +123,7 @@ private struct GeneralSettingsTab: View {
                 Button("Quit EdgeNoted", role: .destructive) {
                     appState.coordinator?.requestQuit()
                 }
+                .focusEffectDisabled()
             } footer: {
                 Text(
                     "EdgeNoted runs in the background with no Dock or menu bar icon, so "
@@ -153,6 +154,7 @@ private struct HotKeySettingRow: View {
                 Text(isRecording ? "Press keys…" : settings.hotKeyDescription)
                     .frame(minWidth: 110)
             }
+            .focusEffectDisabled()
             .onChange(of: isRecording) { _, recording in
                 if recording {
                     recorder.begin { keyCode, flags in
@@ -202,6 +204,7 @@ private struct NoteSettingsTab: View {
                         Button("Retry") {
                             Task { await loadNotes() }
                         }
+                        .focusEffectDisabled()
                     }
                 } else {
                     Picker("Displayed note", selection: noteSelection) {
@@ -292,6 +295,7 @@ private struct AppearanceSettingsTab: View {
                 Button("Add Custom Theme") {
                     _ = settings.addCustomTheme()
                 }
+                .focusEffectDisabled()
             }
         }
         .formStyle(.grouped)
@@ -312,6 +316,7 @@ private struct AppearanceSettingsTab: View {
             }
         }
         .buttonStyle(.plain)
+        .focusEffectDisabled()
     }
 
     private func customThemeRow(_ theme: Theme) -> some View {
@@ -330,6 +335,7 @@ private struct AppearanceSettingsTab: View {
                 }
             }
             .buttonStyle(.plain)
+            .focusEffectDisabled()
 
             Menu {
                 Button("Duplicate") {
@@ -356,6 +362,7 @@ private struct AppearanceSettingsTab: View {
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
+            .focusEffectDisabled()
         }
     }
 
@@ -405,6 +412,7 @@ private struct AutomationSettingsTab: View {
                     test()
                 }
                 .disabled(isTesting)
+                .focusEffectDisabled()
                 if isTesting {
                     ProgressView()
                         .controlSize(.small)
@@ -433,6 +441,7 @@ private struct AutomationSettingsTab: View {
                     NSWorkspace.shared.open(url)
                 }
             }
+            .focusEffectDisabled()
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -517,6 +526,7 @@ private struct LoggingSection: View {
                 }
                 .controlSize(.small)
                 .disabled(logDirectory == nil)
+                .focusEffectDisabled()
             }
             Text("Diagnostics are written to rolling files (EdgeNoted.log, EdgeNoted-1.log, …).")
                 .font(.caption2)

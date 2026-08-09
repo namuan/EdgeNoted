@@ -69,6 +69,7 @@ private struct PanelHeaderView: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .frame(width: 132)
+            .focusEffectDisabled()
 
             Menu {
                 Button("Settings…", systemImage: "gearshape") {
@@ -86,6 +87,7 @@ private struct PanelHeaderView: View {
                 Image(systemName: "ellipsis.circle")
             }
             .menuStyle(.borderlessButton)
+            .focusEffectDisabled()
             .help("More actions")
         }
         .padding(.horizontal, 16)
@@ -126,8 +128,11 @@ private struct ConflictBannerView: View {
             )
             HStack(spacing: 10) {
                 Button("Keep Mine") { appState.resolveConflictKeepMine() }
+                    .focusEffectDisabled()
                 Button("Take Theirs") { appState.resolveConflictTakeRemote() }
+                    .focusEffectDisabled()
                 Button("Open in Notes") { appState.openSelectedNoteInNotes() }
+                    .focusEffectDisabled()
                 Spacer()
             }
             .controlSize(.small)
@@ -157,6 +162,7 @@ private struct AutomationErrorBar: View {
             HStack(spacing: 10) {
                 Button("Retry") { appState.retryAutomation() }
                     .disabled(appState.isLoading)
+                    .focusEffectDisabled()
                 if appState.automationDenied {
                     Button("Open Privacy & Security") {
                         if let url = URL(
@@ -165,6 +171,7 @@ private struct AutomationErrorBar: View {
                             NSWorkspace.shared.open(url)
                         }
                     }
+                    .focusEffectDisabled()
                 }
                 Spacer()
             }
