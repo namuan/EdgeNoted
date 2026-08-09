@@ -390,73 +390,119 @@ private struct AppearanceSettingsTab: View {
 // MARK: - Automation
 
 private struct AutomationSettingsTab: View {
+    private enum ConnectionState {
+        case notChecked
+        case checking
+        case connected
+        case failed
+    }
+
     @Environment(AppState.self) private var appState
     @State private var testResult: String?
     @State private var isTesting = false
+    @State private var connectionState: ConnectionState = .notChecked
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Apple Notes & Reminders integration")
-                .font(.headline)
-            Text(
-                "EdgeNoted reads and writes your notes and reminders through Apple's "
-                    + "Apple Events (AppleScript). On first use, macOS asks you to allow "
-                    + "EdgeNoted to control Notes and Reminders."
-            )
-            .font(.callout)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
+        Form {
+            Section {
+                LabeledContent("Apple Notes") {
+                    connectionStatus
+                }
+                LabeledContent("Reminders") {
+                    connectionStatus
+                }
 
-            HStack {
-                Button("Test Connection") {
-                    test()
+                HStack(spacing: 8) {
+                    Button("Test Connection") {
+                        test()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isTesting)
+                    .focusEffectDisabled()
+                    if isTesting {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
                 }
-                .disabled(isTesting)
+            } header: {
+                Text("Connection")
+            } footer: {
+                Text("Checks that EdgeNoted can reach Apple Notes and Reminders.")
+            }
+
+            Section {
+
+                Text(
+                    "EdgeNoted uses Apple Events to read and write your selected Apple Note, "
+                        + "and requests Reminders access to show due tasks. macOS controls these permissions."
+                )
+                .fixedSize(horizontal: false, vertical: true)
+
+                Button("Open Privacy & Security") {
+                    if let url = URL(
+                        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation"
+                    ) {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
                 .focusEffectDisabled()
-                if isTesting {
-                    ProgressView()
-                        .controlSize(.small)
-                }
+            } header: {
+                Text("Permissions")
             }
 
             if let testResult {
-                Text(testResult)
-                    .font(.callout)
-                    .textSelection(.enabled)
+                Section {
+                    Text(testResult)
+                        .textSelection(.enabled)
+                } header: {
+                    Text("Last connection check")
+                }
             }
 
             if let automationError = appState.automationError {
-                HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle.fill")
+                Section {
+                    Label(automationError, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
-                    Text(automationError)
                         .textSelection(.enabled)
+                } header: {
+                    Text("Attention")
                 }
             }
-
-            Spacer()
-
-            Button("Open Privacy & Security") {
-                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") {
-                    NSWorkspace.shared.open(url)
-                }
-            }
-            .focusEffectDisabled()
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .formStyle(.grouped)
+    }
+
+    @ViewBuilder
+    private var connectionStatus: some View {
+        switch connectionState {
+        case .notChecked:
+            Label("Not checked", systemImage: "circle.dashed")
+                .foregroundStyle(.secondary)
+        case .checking:
+            ProgressView()
+                .controlSize(.small)
+        case .connected:
+            Label("Connected", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+        case .failed:
+            Label("Needs attention", systemImage: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+        }
     }
 
     private func test() {
         isTesting = true
+        connectionState = .checking
         testResult = nil
         Task {
             do {
                 let folders = try await appState.notes.fetchFolders()
                 let lists = try await appState.reminders.fetchLists()
                 testResult = "Connected. Found \(folders.count) Notes folder(s) and \(lists.count) Reminders list(s)."
+                connectionState = .connected
             } catch {
                 testResult = "Failed: \(error.localizedDescription)"
+                connectionState = .failed
             }
             isTesting = false
         }
