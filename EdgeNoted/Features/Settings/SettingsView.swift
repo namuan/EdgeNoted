@@ -4,23 +4,64 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
     @Environment(SettingsStore.self) private var settings
+    @State private var selection: SettingsSection? = .general
 
     var body: some View {
-        TabView {
-            GeneralSettingsTab()
-                .tabItem { Label("General", systemImage: "gearshape") }
-            NoteSettingsTab()
-                .tabItem { Label("Note", systemImage: "note.text") }
-            AppearanceSettingsTab()
-                .tabItem { Label("Appearance", systemImage: "paintpalette") }
-            AutomationSettingsTab()
-                .tabItem { Label("Automation", systemImage: "apple.terminal") }
-            AboutSettingsTab()
-                .tabItem { Label("About", systemImage: "info.circle") }
+        NavigationSplitView {
+            List(selection: $selection) {
+                ForEach(SettingsSection.allCases) { section in
+                    Label(section.title, systemImage: section.symbol)
+                        .tag(section)
+                }
+            }
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 220)
+        } detail: {
+            Group {
+                switch selection ?? .general {
+                case .general: GeneralSettingsTab()
+                case .note: NoteSettingsTab()
+                case .appearance: AppearanceSettingsTab()
+                case .automation: AutomationSettingsTab()
+                case .about: AboutSettingsTab()
+                }
+            }
+            .navigationTitle((selection ?? .general).title)
         }
-        .frame(width: 540, height: 420)
+        .navigationSplitViewStyle(.balanced)
+        .frame(minWidth: 680, idealWidth: 760, minHeight: 480, idealHeight: 540)
         .environment(settings)
         .environment(appState)
+    }
+}
+
+private enum SettingsSection: CaseIterable, Identifiable {
+    case general
+    case note
+    case appearance
+    case automation
+    case about
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .general: "General"
+        case .note: "Note"
+        case .appearance: "Appearance"
+        case .automation: "Automation"
+        case .about: "About"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .general: "gearshape"
+        case .note: "note.text"
+        case .appearance: "paintpalette"
+        case .automation: "apple.terminal"
+        case .about: "info.circle"
+        }
     }
 }
 
@@ -57,6 +98,10 @@ private struct GeneralSettingsTab: View {
                     Slider(value: $settings.panelWidth, in: 320...700, step: 10)
                         .frame(width: 160)
                 }
+                LabeledContent("Panel height") {
+                    Slider(value: $settings.panelHeight, in: 420...900, step: 10)
+                        .frame(width: 160)
+                }
             }
             Section {
                 Toggle("Launch at login", isOn: $settings.launchAtLogin)
@@ -80,7 +125,7 @@ private struct GeneralSettingsTab: View {
             } footer: {
                 Text(
                     "EdgeNoted runs in the background with no Dock or menu bar icon, so "
-                        + "this (or the panel's power button) is how you exit the app."
+                        + "use this command when you want to quit it."
                 )
             }
         }

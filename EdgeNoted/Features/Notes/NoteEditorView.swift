@@ -22,10 +22,7 @@ struct NoteEditorView: View {
     @ViewBuilder
     private func editor() -> some View {
         VStack(spacing: 0) {
-            titleBar
-            Rectangle()
-                .fill(theme.secondaryColor.opacity(0.25))
-                .frame(height: 1)
+            editorToolbar
             if appState.noteIsReadOnly {
                 ReadOnlyEditorView()
             } else if appState.editorMode == .edit {
@@ -37,11 +34,11 @@ struct NoteEditorView: View {
         }
     }
 
-    private var titleBar: some View {
-        HStack(spacing: 8) {
+    private var editorToolbar: some View {
+        HStack(spacing: 10) {
             if !appState.noteIsReadOnly {
                 Picker(
-                    "Mode",
+                    "View",
                     selection: Binding(
                         get: { appState.editorMode },
                         set: { appState.editorMode = $0 }
@@ -52,32 +49,37 @@ struct NoteEditorView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .frame(width: 130)
+                .frame(width: 124)
             }
             Spacer()
 
             Button {
                 Task { await appState.syncFromNotesNow() }
             } label: {
-                if appState.isSyncing {
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                }
+                Label("Sync", systemImage: "arrow.triangle.2.circlepath")
+                    .labelStyle(.iconOnly)
+                    .overlay {
+                        if appState.isSyncing {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                    }
             }
-            .help("Sync from Apple Notes (pull latest changes)")
+            .help("Sync from Apple Notes")
             .disabled(appState.isSyncing)
 
             Button {
                 appState.openSelectedNoteInNotes()
             } label: {
-                Image(systemName: "arrow.up.forward.app")
+                Label("Open in Apple Notes", systemImage: "arrow.up.forward.app")
+                    .labelStyle(.iconOnly)
             }
             .help("Open in Apple Notes")
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .controlSize(.small)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(theme.secondaryColor.opacity(0.08))
     }
 
     private var statusBar: some View {
@@ -102,8 +104,9 @@ struct NoteEditorView: View {
             }
         }
         .font(.caption)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(theme.secondaryColor.opacity(0.06))
     }
 
     private var theme: Theme { settings.activeTheme() }

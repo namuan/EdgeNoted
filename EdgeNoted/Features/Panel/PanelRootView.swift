@@ -9,9 +9,6 @@ struct PanelRootView: View {
     var body: some View {
         VStack(spacing: 0) {
             PanelHeaderView()
-            Rectangle()
-                .fill(theme.secondaryColor.opacity(0.25))
-                .frame(height: 1)
             Group {
                 switch appState.activeSection {
                 case .notes: NotesSectionView()
@@ -28,12 +25,13 @@ struct PanelRootView: View {
         }
         .frame(width: settings.panelWidth)
         .frame(maxHeight: .infinity)
-        .background(theme.backgroundColor)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .background(theme.backgroundColor.opacity(0.96))
+        .clipShape(.rect(cornerRadius: 16))
         .overlay {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(theme.secondaryColor.opacity(0.35), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(theme.secondaryColor.opacity(0.18), lineWidth: 1)
         }
+        .shadow(color: .black.opacity(0.14), radius: 20, y: 8)
         .tint(theme.accentColor)
         .onExitCommand { appState.hidePanel() }
     }
@@ -41,51 +39,75 @@ struct PanelRootView: View {
     private var theme: Theme { settings.activeTheme() }
 }
 
-/// Top bar: section switcher, settings, hide.
+/// A compact identity-first header for the active workspace.
 private struct PanelHeaderView: View {
     @Environment(AppState.self) private var appState
+    @Environment(SettingsStore.self) private var settings
 
     var body: some View {
         @Bindable var appState = appState
-        VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Picker("Section", selection: $appState.activeSection) {
-                    ForEach(AppState.Section.allCases) { section in
-                        Text(section.title).tag(section)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 180)
-
-                Spacer()
-
-                Button {
-                    appState.coordinator?.openSettings()
-                } label: {
-                    Image(systemName: "gearshape")
-                }
-                .help("Settings")
-
-                Button {
-                    appState.hidePanel()
-                } label: {
-                    Image(systemName: "chevron.right")
-                }
-                .help("Hide (Esc)")
-
-                Button {
-                    appState.coordinator?.requestQuit()
-                } label: {
-                    Image(systemName: "power")
-                }
-                .help("Quit EdgeNoted")
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.headline)
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(theme.secondaryColor)
+                    .lineLimit(1)
             }
-            .padding(.horizontal, 12)
-            .padding(.top, 10)
-            .padding(.bottom, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Picker("Workspace", selection: $appState.activeSection) {
+                Label("Notes", systemImage: "note.text").tag(AppState.Section.notes)
+                Label("Reminders", systemImage: "checklist").tag(AppState.Section.reminders)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 132)
+
+            Menu {
+                Button("Settings…", systemImage: "gearshape") {
+                    appState.coordinator?.openSettings()
+                }
+                Divider()
+                Button("Hide", systemImage: "chevron.right") {
+                    appState.hidePanel()
+                }
+                .keyboardShortcut(.escape, modifiers: [])
+                Button("Quit EdgeNoted", systemImage: "power", role: .destructive) {
+                    appState.coordinator?.requestQuit()
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .menuStyle(.borderlessButton)
+            .help("More actions")
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(theme.backgroundColor.opacity(0.72))
+    }
+
+    private var title: String {
+        switch appState.activeSection {
+        case .notes:
+            appState.draftTitle.isEmpty ? "Notes" : appState.draftTitle
+        case .reminders:
+            "Reminders"
         }
     }
+
+    private var subtitle: String {
+        switch appState.activeSection {
+        case .notes:
+            appState.noteIsReadOnly ? "Apple Notes · Read-only" : "Apple Notes"
+        case .reminders:
+            "Due today and overdue"
+        }
+    }
+
+    private var theme: Theme { settings.activeTheme() }
 }
 
 /// Shown when the remote note changed while local edits were pending.
@@ -106,9 +128,9 @@ private struct ConflictBannerView: View {
             }
             .controlSize(.small)
         }
-        .padding(8)
-        .background(.yellow.opacity(0.18), in: RoundedRectangle(cornerRadius: 6))
-        .padding(8)
+        .padding(10)
+        .background(.yellow.opacity(0.18), in: RoundedRectangle(cornerRadius: 8))
+        .padding(10)
     }
 }
 
@@ -144,8 +166,8 @@ private struct AutomationErrorBar: View {
             }
             .controlSize(.small)
         }
-        .padding(8)
-        .background(.red.opacity(0.15), in: RoundedRectangle(cornerRadius: 6))
-        .padding(8)
+        .padding(10)
+        .background(.red.opacity(0.15), in: RoundedRectangle(cornerRadius: 8))
+        .padding(10)
     }
 }

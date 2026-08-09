@@ -45,7 +45,7 @@ struct ScreenEdgeGeometryTests {
         #expect(ScreenEdgeGeometry.edge(containing: point, screens: screens, threshold: 8) == .left)
     }
 
-    @Test("Visible panel frames span the usable screen height")
+    @Test("Visible panel frames honour the configured compact size")
     func visibleFrames() {
         let size = CGSize(width: 460, height: 600)
         let usableScreen = CGRect(x: 0, y: 74, width: 1920, height: 982)
@@ -53,17 +53,17 @@ struct ScreenEdgeGeometryTests {
         let right = ScreenEdgeGeometry.visibleFrame(screen: usableScreen, edge: .right, panelSize: size, margin: 0)
         #expect(right.maxX == 1920)
         #expect(right.width == 460)
-        #expect(right.minY == usableScreen.minY)
-        #expect(right.height == usableScreen.height)
+        #expect(right.midY == usableScreen.midY)
+        #expect(right.height == 600)
 
         let left = ScreenEdgeGeometry.visibleFrame(screen: usableScreen, edge: .left, panelSize: size, margin: 0)
         #expect(left.minX == 0)
-        #expect(left.minY == usableScreen.minY)
-        #expect(left.height == usableScreen.height)
+        #expect(left.midY == usableScreen.midY)
+        #expect(left.height == 600)
 
         let bottom = ScreenEdgeGeometry.visibleFrame(screen: usableScreen, edge: .bottom, panelSize: size, margin: 0)
         #expect(bottom.minY == usableScreen.minY)
-        #expect(bottom.height == usableScreen.height)
+        #expect(bottom.height == 600)
     }
 
     @Test("Hidden frames move off-screen in the slide direction")

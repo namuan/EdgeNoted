@@ -81,31 +81,36 @@ enum ScreenEdgeGeometry {
         return false
     }
 
-    /// Frame for the panel when visible, docked at `edge` of the usable screen
-    /// area. Callers provide `NSScreen.visibleFrame` so the panel avoids system
-    /// UI such as the menu bar and Dock.
+    /// Frame for a compact panel docked at `edge` of the usable screen area.
+    /// The configured size is honoured, constrained only by the available
+    /// screen size, so the panel reads as a focused workspace rather than a
+    /// full-height overlay. Callers provide `NSScreen.visibleFrame` to avoid
+    /// system UI such as the menu bar and Dock.
     static func visibleFrame(screen: CGRect, edge: ScreenEdge, panelSize: CGSize, margin: CGFloat) -> CGRect {
+        let width = max(1, min(panelSize.width, screen.width - (margin * 2)))
+        let height = max(1, min(panelSize.height, screen.height - (margin * 2)))
+
         switch edge {
         case .left:
             return CGRect(
                 x: screen.minX + margin,
-                y: screen.minY,
-                width: panelSize.width,
-                height: screen.height
+                y: screen.midY - height / 2,
+                width: width,
+                height: height
             )
         case .right:
             return CGRect(
-                x: screen.maxX - panelSize.width - margin,
-                y: screen.minY,
-                width: panelSize.width,
-                height: screen.height
+                x: screen.maxX - width - margin,
+                y: screen.midY - height / 2,
+                width: width,
+                height: height
             )
         case .bottom:
             return CGRect(
-                x: screen.midX - panelSize.width / 2,
-                y: screen.minY,
-                width: panelSize.width,
-                height: screen.height
+                x: screen.midX - width / 2,
+                y: screen.minY + margin,
+                width: width,
+                height: height
             )
         }
     }

@@ -16,63 +16,80 @@ struct RemindersSectionView: View {
         }
     }
 
-    /// One row: leading status icon, capture field, and a compact list menu.
+    /// A dedicated capture area keeps creating a reminder separate from the due list.
     private var addRow: some View {
         @Bindable var appState = appState
-        return HStack(spacing: 6) {
-            if appState.isCreatingReminder {
-                ProgressView()
-                    .controlSize(.small)
-            } else if let listName = appState.lastCreatedListName {
-                Image(systemName: "checkmark.circle.fill")
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label("New reminder", systemImage: "plus.circle.fill")
+                    .font(.headline)
                     .foregroundStyle(settings.activeTheme().accentColor)
-                    .help("Added to \(listName)")
-                    .accessibilityLabel("Added to \(listName)")
-            } else {
-                Image(systemName: "plus.circle")
-                    .foregroundStyle(settings.activeTheme().accentColor)
+                Spacer()
+                listMenu
             }
 
-            TextField("Add reminder…", text: $appState.quickCaptureText)
-                .textFieldStyle(.plain)
-                .disabled(appState.isCreatingReminder || appState.reminderLists.isEmpty)
-                .onSubmit {
-                    appState.quickCapture()
-                }
+            HStack(spacing: 8) {
+                TextField("What needs doing?", text: $appState.quickCaptureText)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(appState.isCreatingReminder || appState.reminderLists.isEmpty)
+                    .onSubmit { appState.quickCapture() }
 
-            DatePicker("Due", selection: $appState.quickCaptureDueDate)
-                .datePickerStyle(.compact)
-                .labelsHidden()
-                .disabled(appState.isCreatingReminder || appState.reminderLists.isEmpty)
-                .help("Due date (default: one hour from now)")
-
-            Menu {
-                ForEach(appState.reminderLists) { list in
-                    Button {
-                        appState.quickCaptureListID = list.id
-                    } label: {
-                        if list.id == appState.quickCaptureListID {
-                            Label(list.name, systemImage: "checkmark")
-                        } else {
-                            Text(list.name)
+                Button("Add") { appState.quickCapture() }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(
+                        appState.quickCaptureText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            || appState.isCreatingReminder
+                            || appState.reminderLists.isEmpty
+                    )
+                    .overlay {
+                        if appState.isCreatingReminder {
+                            ProgressView()
+                                .controlSize(.small)
                         }
                     }
-                }
-            } label: {
-                HStack(spacing: 3) {
-                    Image(systemName: "list.bullet")
-                    Text(appState.selectedQuickCaptureListName)
-                        .lineLimit(1)
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
             }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-            .disabled(appState.reminderLists.isEmpty)
+
+            HStack(spacing: 6) {
+                Text("Due")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                DatePicker("Due", selection: $appState.quickCaptureDueDate)
+                    .datePickerStyle(.compact)
+                    .labelsHidden()
+                    .disabled(appState.isCreatingReminder || appState.reminderLists.isEmpty)
+                    .help("Due date (default: one hour from now)")
+                if let listName = appState.lastCreatedListName {
+                    Spacer()
+                    Label("Added to \(listName)", systemImage: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(settings.activeTheme().accentColor)
+                }
+            }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(16)
+        .background(settings.activeTheme().secondaryColor.opacity(0.08))
+    }
+
+    private var listMenu: some View {
+        Menu {
+            ForEach(appState.reminderLists) { list in
+                Button {
+                    appState.quickCaptureListID = list.id
+                } label: {
+                    if list.id == appState.quickCaptureListID {
+                        Label(list.name, systemImage: "checkmark")
+                    } else {
+                        Text(list.name)
+                    }
+                }
+            }
+        } label: {
+            Label(appState.selectedQuickCaptureListName, systemImage: "list.bullet")
+                .font(.caption)
+                .lineLimit(1)
+        }
+        .menuStyle(.borderlessButton)
+        .disabled(appState.reminderLists.isEmpty)
     }
 
     @ViewBuilder
@@ -207,8 +224,21 @@ private struct ReminderRow: View {
             .menuStyle(.borderlessButton)
             .fixedSize()
         }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 16)
+        .contentShape(.rect)
+        .contextMenu {
+            Button(item.isCompleted ? "Mark Incomplete" : "Complete") {
+                appState.toggleReminder(item)
+            }
+            Button("Open in Reminders", systemImage: "arrow.up.forward.app") {
+                appState.openRemindersApp()
+            }
+            Divider()
+            Button("Delete", systemImage: "trash", role: .destructive) {
+                appState.deleteReminder(item)
+            }
+        }
     }
 
     private var theme: Theme { settings.activeTheme() }
