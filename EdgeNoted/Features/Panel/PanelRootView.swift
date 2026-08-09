@@ -33,6 +33,10 @@ struct PanelRootView: View {
         }
         .shadow(color: .black.opacity(0.14), radius: 20, y: 8)
         .tint(theme.accentColor)
+        // The system focus halo is visually much stronger than this compact
+        // utility surface. Buttons remain reachable by keyboard and expose
+        // their labels to VoiceOver, without the oversized ring.
+        .focusEffectDisabled()
         .onExitCommand { appState.hidePanel() }
     }
 

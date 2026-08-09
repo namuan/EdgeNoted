@@ -29,6 +29,7 @@ struct SettingsView: View {
             .navigationTitle((selection ?? .general).title)
         }
         .navigationSplitViewStyle(.balanced)
+        .focusEffectDisabled()
         .frame(minWidth: 680, idealWidth: 760, minHeight: 480, idealHeight: 540)
         .environment(settings)
         .environment(appState)
