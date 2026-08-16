@@ -14,6 +14,10 @@ struct RemindersSectionView: View {
                 .frame(height: 1)
             reminderList
         }
+        // The panel gives each section the full available height. Keep this
+        // section's intrinsic content pinned to the top instead of allowing
+        // SwiftUI to vertically center it and leave a large blank band above.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     /// A dedicated capture area keeps creating a reminder separate from the due list.
