@@ -40,15 +40,115 @@ struct ReminderItem: Identifiable, Hashable, Sendable {
 
     /// Whether this incomplete reminder belongs in the overdue-and-today panel.
     func isDueTodayOrOverdue(referenceDate: Date = .now, calendar: Calendar = .current) -> Bool {
-        guard !isCompleted, let dueEpoch else { return false }
+        isVisible(in: .today, referenceDate: referenceDate, calendar: calendar)
+    }
+
+    /// Whether this reminder falls inside `horizon`: incomplete, with a due
+    /// date before the horizon cutoff (or any due date at all for `.all`).
+    func isVisible(
+        in horizon: ReminderHorizon,
+        referenceDate: Date = .now,
+        calendar: Calendar = .current
+    ) -> Bool {
+        guard !isCompleted else { return false }
+        guard let days = horizon.days else { return true }
+        guard let dueEpoch else { return false }
         guard
-            let startOfTomorrow = calendar.date(
+            let cutoff = calendar.date(
                 byAdding: .day,
-                value: 1,
+                value: days,
                 to: calendar.startOfDay(for: referenceDate)
             )
         else { return false }
-        return Date(timeIntervalSince1970: dueEpoch) < startOfTomorrow
+        return Date(timeIntervalSince1970: dueEpoch) < cutoff
+    }
+}
+
+/// How far ahead the Reminders panel looks when deciding what to show.
+/// Every horizon includes overdue items; `.all` shows every incomplete
+/// reminder regardless of due date.
+enum ReminderHorizon: String, CaseIterable, Identifiable, Sendable {
+    case today
+    case twoDays
+    case threeDays
+    case sevenDays
+    case thirtyDays
+    case all
+
+    var id: String { rawValue }
+
+    /// Days from the start of today included in this horizon, or nil for `.all`.
+    var days: Int? {
+        switch self {
+        case .today: 1
+        case .twoDays: 2
+        case .threeDays: 3
+        case .sevenDays: 7
+        case .thirtyDays: 30
+        case .all: nil
+        }
+    }
+
+    /// Compact label for the header control.
+    var shortTitle: String {
+        switch self {
+        case .today: "Today"
+        case .twoDays: "2 days"
+        case .threeDays: "3 days"
+        case .sevenDays: "7 days"
+        case .thirtyDays: "30 days"
+        case .all: "All"
+        }
+    }
+
+    /// Full label for the menu.
+    var title: String {
+        switch self {
+        case .today: "Overdue + today"
+        case .twoDays: "Overdue + today & tomorrow"
+        case .threeDays: "Overdue + next 3 days"
+        case .sevenDays: "Overdue + next 7 days"
+        case .thirtyDays: "Overdue + next 30 days"
+        case .all: "All reminders"
+        }
+    }
+
+    /// Subtitle shown under the section title in the panel header.
+    var subtitle: String {
+        switch self {
+        case .today: "Due today and overdue"
+        case .twoDays: "Due today, tomorrow, or overdue"
+        case .threeDays: "Due in the next 3 days"
+        case .sevenDays: "Due in the next 7 days"
+        case .thirtyDays: "Due in the next 30 days"
+        case .all: "All incomplete reminders"
+        }
+    }
+
+    /// Headline for the empty state.
+    var emptyStateTitle: String {
+        switch self {
+        case .all: "No reminders"
+        default: "No reminders due"
+        }
+    }
+
+    /// Description for the empty state.
+    var emptyStateDescription: String {
+        switch self {
+        case .today:
+            "No incomplete reminders are overdue or due today in any list."
+        case .twoDays:
+            "No incomplete reminders are overdue or due today or tomorrow in any list."
+        case .threeDays:
+            "No incomplete reminders are due in the next 3 days in any list."
+        case .sevenDays:
+            "No incomplete reminders are due in the next 7 days in any list."
+        case .thirtyDays:
+            "No incomplete reminders are due in the next 30 days in any list."
+        case .all:
+            "No incomplete reminders in any list."
+        }
     }
 }
 

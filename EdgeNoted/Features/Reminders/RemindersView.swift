@@ -103,9 +103,9 @@ struct RemindersSectionView: View {
     private var reminderList: some View {
         if appState.displayedReminderItems.isEmpty {
             ContentUnavailableView(
-                "No reminders due",
+                settings.reminderHorizon.emptyStateTitle,
                 systemImage: "checklist",
-                description: Text("No incomplete reminders are overdue or due today in any list.")
+                description: Text(settings.reminderHorizon.emptyStateDescription)
             )
         } else {
             ScrollView {

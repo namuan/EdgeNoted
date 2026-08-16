@@ -61,4 +61,26 @@ struct SettingsStoreTests {
         #expect(reloaded.configuredNoteFolderName == "Work")
         #expect(reloaded.configuredNoteName == "Agenda")
     }
+
+    @Test("Reminder horizon defaults to today and persists")
+    func reminderHorizonPersistence() throws {
+        let suite = "SettingsStoreTests-horizon-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let settings = SettingsStore(defaults: defaults)
+
+        #expect(settings.reminderHorizon == .today)
+
+        settings.reminderHorizon = .sevenDays
+
+        let reloaded = SettingsStore(defaults: defaults)
+        #expect(reloaded.reminderHorizon == .sevenDays)
+    }
+
+    @Test("An unknown stored horizon falls back to today")
+    func reminderHorizonUnknownFallsBack() throws {
+        let suite = "SettingsStoreTests-horizon-unknown-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defaults.set("fortyDays", forKey: "reminderHorizon")
+        #expect(SettingsStore(defaults: defaults).reminderHorizon == .today)
+    }
 }

@@ -75,7 +75,7 @@ final class AppState {
     var lastCreatedListName: String?
 
     var displayedReminderItems: [ReminderItem] {
-        reminderItems.filter { $0.isDueTodayOrOverdue() }
+        reminderItems.filter { $0.isVisible(in: settings.reminderHorizon) }
     }
 
     /// Name shown on the capture row's list picker.
@@ -660,22 +660,24 @@ final class AppState {
 
     /// Records the bridge data and local filter decision without reminder names.
     private func logReminderVisibility() {
+        let horizon = settings.reminderHorizon
         let referenceDate = Date()
         let calendar = Calendar.current
-        let startOfToday = calendar.startOfDay(for: referenceDate)
-        guard let startOfTomorrow = calendar.date(byAdding: .day, value: 1, to: startOfToday) else {
-            Log.error("Reminder visibility evaluation failed", category: .reminders)
-            return
-        }
-
         let visibleItems = reminderItems.filter {
-            $0.isDueTodayOrOverdue(referenceDate: referenceDate, calendar: calendar)
+            $0.isVisible(in: horizon, referenceDate: referenceDate, calendar: calendar)
         }
         let completedCount = reminderItems.filter(\.isCompleted).count
         let missingDueDateCount = reminderItems.filter { $0.dueEpoch == nil }.count
-        let futureCount = reminderItems.filter {
-            guard !($0.isCompleted), let dueEpoch = $0.dueEpoch else { return false }
-            return dueEpoch >= startOfTomorrow.timeIntervalSince1970
+        let outsideHorizonCount = reminderItems.filter {
+            guard let days = horizon.days, !$0.isCompleted, let dueEpoch = $0.dueEpoch else { return false }
+            guard
+                let cutoff = calendar.date(
+                    byAdding: .day,
+                    value: days,
+                    to: calendar.startOfDay(for: referenceDate)
+                )
+            else { return false }
+            return dueEpoch >= cutoff.timeIntervalSince1970
         }.count
 
         Log.info(
@@ -684,9 +686,8 @@ final class AppState {
             metadata: [
                 "completed": String(completedCount),
                 "dueMissing": String(missingDueDateCount),
-                "future": String(futureCount),
-                "startOfToday": String(Int(startOfToday.timeIntervalSince1970)),
-                "startOfTomorrow": String(Int(startOfTomorrow.timeIntervalSince1970)),
+                "outsideHorizon": String(outsideHorizonCount),
+                "horizon": horizon.rawValue,
                 "total": String(reminderItems.count),
                 "visible": String(visibleItems.count),
             ]
@@ -697,10 +698,19 @@ final class AppState {
             let filterReason: String
             if item.isCompleted {
                 filterReason = "completed"
-            } else if item.dueEpoch == nil {
+            } else if item.dueEpoch == nil, horizon.days != nil {
                 filterReason = "dueMissing"
-            } else if let dueEpoch = item.dueEpoch, dueEpoch >= startOfTomorrow.timeIntervalSince1970 {
-                filterReason = "future"
+            } else if
+                let dueEpoch = item.dueEpoch,
+                let days = horizon.days,
+                let cutoff = calendar.date(
+                    byAdding: .day,
+                    value: days,
+                    to: calendar.startOfDay(for: referenceDate)
+                ),
+                dueEpoch >= cutoff.timeIntervalSince1970
+            {
+                filterReason = "outsideHorizon"
             } else {
                 filterReason = "unknown"
             }

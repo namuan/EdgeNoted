@@ -344,6 +344,48 @@ struct AppStateIntegrationTests {
         #expect(harness.state.displayedReminderItems.map(\.id) == [item.id])
     }
 
+    @Test("Displayed reminders follow the configured horizon")
+    func displayedRemindersFollowHorizon() async throws {
+        let harness = try await makeHarness()
+        await harness.state.startup()
+        let startOfToday = Calendar.current.startOfDay(for: .now)
+
+        harness.state.reminderItems = [
+            ReminderItem(
+                id: "overdue",
+                name: "Overdue",
+                isCompleted: false,
+                dueEpoch: startOfToday.addingTimeInterval(-86_400).timeIntervalSince1970,
+                priority: 0
+            ),
+            ReminderItem(
+                id: "tomorrow",
+                name: "Tomorrow",
+                isCompleted: false,
+                dueEpoch: startOfToday.addingTimeInterval(86_400).timeIntervalSince1970,
+                priority: 0
+            ),
+            ReminderItem(
+                id: "unscheduled",
+                name: "Unscheduled",
+                isCompleted: false,
+                dueEpoch: nil,
+                priority: 0
+            ),
+        ]
+
+        // Default horizon: only the overdue item is visible.
+        #expect(harness.state.displayedReminderItems.map(\.id) == ["overdue"])
+
+        // Widening the horizon extends the window without a refetch.
+        harness.state.settings.reminderHorizon = .twoDays
+        #expect(harness.state.displayedReminderItems.map(\.id) == ["overdue", "tomorrow"])
+
+        // The catch-all horizon also surfaces unscheduled reminders.
+        harness.state.settings.reminderHorizon = .all
+        #expect(harness.state.displayedReminderItems.map(\.id) == ["overdue", "tomorrow", "unscheduled"])
+    }
+
     @Test("Clearing a reminder due date removes it through the bridge contract")
     func clearReminderDueDate() async throws {
         let reminders = FakeRemindersService()

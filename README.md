@@ -24,7 +24,9 @@ view and edit a single note instantly, and hides again — no app switching.
   panel; if you are editing when the remote note changes, you choose
   Keep Mine / Take Theirs / Open in Notes — nothing is overwritten silently.
 - **Apple Reminders.** Browse lists, view/create/edit/complete reminders, set
-  due dates and priorities, and quick-capture new ones.
+  due dates and priorities, and quick-capture new ones. A horizon control in
+  the panel header widens the view from overdue + due today out to overdue +
+  30 days, or everything.
 - **Themes:** choose built-in themes or create your own.
 - **Extras:** color-code preview (`#rrggbb`/`#rgb` swatches), interactive
   checklists (`- [ ]` / `- [x]`).

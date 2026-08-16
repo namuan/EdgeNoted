@@ -71,6 +71,10 @@ private struct PanelHeaderView: View {
             .frame(width: 132)
             .focusEffectDisabled()
 
+            if appState.activeSection == .reminders {
+                reminderHorizonMenu
+            }
+
             Menu {
                 Button("Settings…", systemImage: "gearshape") {
                     appState.coordinator?.openSettings()
@@ -109,8 +113,34 @@ private struct PanelHeaderView: View {
         case .notes:
             appState.noteIsReadOnly ? "Apple Notes · Read-only" : "Apple Notes"
         case .reminders:
-            "Due today and overdue"
+            settings.reminderHorizon.subtitle
         }
+    }
+
+    /// Lets the user widen or narrow how far ahead the Reminders list looks.
+    /// Labeled with the current selection so the control always states its state.
+    private var reminderHorizonMenu: some View {
+        Menu {
+            ForEach(ReminderHorizon.allCases) { horizon in
+                Button {
+                    settings.reminderHorizon = horizon
+                } label: {
+                    if horizon == settings.reminderHorizon {
+                        Label(horizon.title, systemImage: "checkmark")
+                    } else {
+                        Text(horizon.title)
+                    }
+                }
+            }
+        } label: {
+            Label(settings.reminderHorizon.shortTitle, systemImage: "calendar")
+                .font(.caption)
+                .lineLimit(1)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .help("Show: \(settings.reminderHorizon.title)")
+        .focusEffectDisabled()
     }
 
     private var theme: Theme { settings.activeTheme() }

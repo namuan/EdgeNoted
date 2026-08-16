@@ -27,6 +27,7 @@ final class SettingsStore {
         static let configuredNoteID = "configuredNoteID"
         static let configuredNoteFolderName = "configuredNoteFolderName"
         static let configuredNoteName = "configuredNoteName"
+        static let reminderHorizon = "reminderHorizon"
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -124,6 +125,13 @@ final class SettingsStore {
         didSet { defaults.set(configuredNoteName, forKey: Keys.configuredNoteName) }
     }
 
+    // MARK: Reminders
+
+    /// How far ahead the Reminders panel looks. Defaults to overdue + today.
+    var reminderHorizon: ReminderHorizon {
+        didSet { defaults.set(reminderHorizon.rawValue, forKey: Keys.reminderHorizon) }
+    }
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         let storedKeyCode = defaults.object(forKey: Keys.hotKeyCode) as? Int ?? 45  // kVK_ANSI_N
@@ -163,6 +171,7 @@ final class SettingsStore {
         configuredNoteID = defaults.string(forKey: Keys.configuredNoteID)
         configuredNoteFolderName = defaults.string(forKey: Keys.configuredNoteFolderName)
         configuredNoteName = defaults.string(forKey: Keys.configuredNoteName)
+        reminderHorizon = ReminderHorizon(rawValue: defaults.string(forKey: Keys.reminderHorizon) ?? "") ?? .today
     }
 
     // MARK: Derived
