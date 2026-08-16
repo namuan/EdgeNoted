@@ -8,6 +8,10 @@ A lightweight, always-available macOS companion for your **Apple Notes** and
 **Apple Reminders**. EdgeNoted slides in from the edge of your screen, lets you
 view and edit a single note instantly, and hides again — no app switching.
 
+<p align="center">
+  <img src="assets/intro.jpg" width="480" alt="EdgeNoted panel">
+</p>
+
 ## What it does
 
 - **Always-on-top edge panel.** Slides in from the left, right, or bottom edge
