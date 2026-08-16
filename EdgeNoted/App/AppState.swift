@@ -204,7 +204,7 @@ final class AppState {
 
     /// Runs an Apple automation request, launching its target app and retrying
     /// if it is still starting up.
-    private func loadWithLaunchRetry<T>(_ operation: () async throws -> T) async throws -> T {
+    private func loadWithLaunchRetry<T: Sendable>(_ operation: () async throws -> T) async throws -> T {
         launchAutomationApps()
         Log.info("Ensuring Notes and Reminders are running", category: .bridge)
         var lastError: Error?
