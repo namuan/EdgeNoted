@@ -90,8 +90,7 @@ struct AppLoggerTests {
         await logger.flush()
         // The logger must have failed to open any file (no fallback), not just
         // have written somewhere else.
-        let activePath = await logger.activeDirectoryPath()
-        #expect(activePath == nil)
+        #expect(!FileManager.default.fileExists(atPath: configuration.preferredDirectory.path))
     }
 
     @Test("Large threshold never rotates small files")

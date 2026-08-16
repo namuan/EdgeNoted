@@ -23,7 +23,6 @@ struct SettingsView: View {
                 case .note: NoteSettingsTab()
                 case .appearance: AppearanceSettingsTab()
                 case .automation: AutomationSettingsTab()
-                case .about: AboutSettingsTab()
                 }
             }
             .navigationTitle((selection ?? .general).title)
@@ -41,7 +40,6 @@ private enum SettingsSection: CaseIterable, Identifiable {
     case note
     case appearance
     case automation
-    case about
 
     var id: Self { self }
 
@@ -51,7 +49,6 @@ private enum SettingsSection: CaseIterable, Identifiable {
         case .note: "Note"
         case .appearance: "Appearance"
         case .automation: "Automation"
-        case .about: "About"
         }
     }
 
@@ -61,7 +58,6 @@ private enum SettingsSection: CaseIterable, Identifiable {
         case .note: "note.text"
         case .appearance: "paintpalette"
         case .automation: "apple.terminal"
-        case .about: "info.circle"
         }
     }
 }
@@ -506,86 +502,5 @@ private struct AutomationSettingsTab: View {
             }
             isTesting = false
         }
-    }
-}
-
-// MARK: - About
-
-private struct AboutSettingsTab: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
-                Image(systemName: "sidebar.right")
-                    .font(.system(size: 36))
-                VStack(alignment: .leading) {
-                    Text("EdgeNoted")
-                        .font(.title2.bold())
-                    Text("Version 1.6")
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Text(
-                "A lightweight, always-available companion for your Apple Notes and Reminders. "
-                    + "Edits are written straight into Apple Notes (one-way); changes made in Notes "
-                    + "are pulled in at startup and via the panel's sync button. Local data "
-                    + "is limited to presentation preferences (pins, order, colors, themes, snippets)."
-            )
-            .font(.callout)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-
-            Text(
-                "Limitations: Apple Notes exposes only plain text through AppleScript, so notes "
-                    + "containing rich formatting are shown read-only, and attachments cannot be "
-                    + "synced. Reordering inside Apple Notes itself is not supported."
-            )
-            .font(.caption)
-            .foregroundStyle(.tertiary)
-            .fixedSize(horizontal: false, vertical: true)
-
-            Divider()
-
-            LoggingSection()
-
-            Spacer()
-        }
-        .padding(20)
-    }
-}
-
-/// Shows where log files live and opens the folder in Finder.
-private struct LoggingSection: View {
-    @State private var logDirectory: String?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Logs")
-                .font(.headline)
-            HStack {
-                Text(logDirectory ?? "Resolving log directory…")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Button("Open Logs Folder") {
-                    openLogsFolder()
-                }
-                .controlSize(.small)
-                .disabled(logDirectory == nil)
-                .focusEffectDisabled()
-            }
-            Text("Diagnostics are written to rolling files (EdgeNoted.log, EdgeNoted-1.log, …).")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-        }
-        .task {
-            logDirectory = await AppLogger.shared.activeDirectoryPath()
-        }
-    }
-
-    private func openLogsFolder() {
-        guard let logDirectory else { return }
-        let url = URL(fileURLWithPath: logDirectory, isDirectory: true)
-        NSWorkspace.shared.open(url)
     }
 }
