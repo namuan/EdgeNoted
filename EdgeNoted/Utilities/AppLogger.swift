@@ -94,12 +94,6 @@ actor AppLogger {
         self.configuration = configuration
     }
 
-    /// The directory logs are actually being written to, once setup has run.
-    func activeDirectoryPath() async -> String? {
-        await setupIfNeeded()
-        return activeDirectory?.path
-    }
-
     func log(
         level: LogLevel,
         category: LogCategory,

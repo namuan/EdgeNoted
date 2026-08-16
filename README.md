@@ -35,7 +35,7 @@ view and edit a single note instantly, and hides again — no app switching.
 - **File logging.** Diagnostics are written to rolling files in
   `~/Library/Logs/EdgeNoted/` (`EdgeNoted.log` rotating to `EdgeNoted-1.log` …
   `EdgeNoted-5.log` at ~1 MB each). Note bodies, titles, and reminder contents
-  are never logged. Reveal the folder from Settings > About > Logs.
+  are never logged.
 
 ## Limitations (by design)
 
