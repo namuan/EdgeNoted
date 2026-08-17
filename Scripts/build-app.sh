@@ -37,8 +37,8 @@ cat > "$APP_BUNDLE/Contents/Info.plist" <<EOF
     <string>6.0</string>
     <key>CFBundleName</key>
     <string>$APP_NAME</string>
-    <key>CFBundleIconName</key>
-    <string>AppIcon</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon.icns</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -59,19 +59,51 @@ cat > "$APP_BUNDLE/Contents/Info.plist" <<EOF
 </plist>
 EOF
 
-# Compile asset catalog if present and non-empty
-if [ -d "$APP_NAME/Resources/Assets.xcassets" ] && [ "$(ls -A "$APP_NAME/Resources/Assets.xcassets" 2>/dev/null)" ]; then
-    echo "==> Compiling asset catalog…"
-    xcrun actool "$APP_NAME/Resources/Assets.xcassets" \
-        --compile "$APP_BUNDLE/Contents/Resources" \
-        --platform macosx \
-        --minimum-deployment-target 14.0 \
-        --app-icon AppIcon \
-        --target-device mac \
-        --output-partial-info-plist "$APP_BUNDLE/Contents/Resources/partial.plist"
+# Build the app icon into AppIcon.icns. Apple's `actool` (which normally
+# compiles an .xcassets catalog) only ships inside full Xcode, not Command
+# Line Tools, so this build must not depend on it. Instead we generate the
+# .icns from the largest PNG in the asset catalog using /usr/bin/sips and
+# /usr/bin/iconutil, both of which ship with macOS and Command Line Tools.
+ICON_SOURCE=""
+ICONSET_DIR="$APP_NAME/Resources/Assets.xcassets/AppIcon.appiconset"
+if [ -d "$ICONSET_DIR" ]; then
+    BIGGEST=0
+    for f in "$ICONSET_DIR"/*.png; do
+        [ -f "$f" ] || continue
+        size=$(stat -f%z "$f")
+        if [ "$size" -gt "$BIGGEST" ]; then
+            BIGGEST=$size
+            ICON_SOURCE=$f
+        fi
+    done
+fi
+if [ -n "$ICON_SOURCE" ]; then
+    echo "==> Generating AppIcon.icns from $(basename "$ICON_SOURCE")…"
+    TMP_DIR=$(mktemp -d)
+    TMP_ICONSET="$TMP_DIR/AppIcon.iconset"
+    mkdir -p "$TMP_ICONSET"
+    # The classic 10-file macOS iconset: each base size plus its @2x variant.
+    while read -r size name; do
+        sips -z "$size" "$size" "$ICON_SOURCE" --out "$TMP_ICONSET/$name" >/dev/null
+    done <<'SIZES'
+16 icon_16x16.png
+32 icon_16x16@2x.png
+32 icon_32x32.png
+64 icon_32x32@2x.png
+128 icon_128x128.png
+256 icon_128x128@2x.png
+256 icon_256x256.png
+512 icon_256x256@2x.png
+512 icon_512x512.png
+1024 icon_512x512@2x.png
+SIZES
+    iconutil -c icns "$TMP_ICONSET" -o "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
+    rm -rf "$TMP_DIR"
+else
+    echo "==> No app icon found; skipping icon generation"
 fi
 
-# Copy remaining resources (excluding .xcassets which was compiled)
+# Copy remaining resources (excluding the asset catalog, already handled above)
 if [ -d "$APP_NAME/Resources" ]; then
     rsync -a --exclude="Assets.xcassets" --exclude="*.entitlements" \
         "$APP_NAME/Resources/" "$APP_BUNDLE/Contents/Resources/" 2>/dev/null || true

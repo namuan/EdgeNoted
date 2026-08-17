@@ -34,7 +34,6 @@ final class EdgePanelController: NSObject {
         let rootView = PanelRootView()
             .environment(appState)
             .environment(settings)
-            .modelContainer(PersistenceController.container)
         let hosting = NSHostingView(rootView: rootView)
         hosting.frame = NSRect(origin: .zero, size: panelSize)
         hosting.autoresizingMask = [.width, .height]

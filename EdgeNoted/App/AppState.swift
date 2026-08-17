@@ -1,7 +1,6 @@
 import AppKit
 import Foundation
 import Observation
-import SwiftData
 
 /// Central observable state for the panel UI. Owns the selected note/reminder,
 /// the editor draft, and sync with Apple Notes (one-way writes, pull on demand).
@@ -31,7 +30,7 @@ final class AppState {
     let notes: any NotesService
     let reminders: any RemindersService
     let settings: SettingsStore
-    let modelContainer: ModelContainer
+    let metaStore: MetaStore
     weak var coordinator: ApplicationCoordinator?
 
     // MARK: Presentation
@@ -102,12 +101,12 @@ final class AppState {
         notes: any NotesService,
         reminders: any RemindersService,
         settings: SettingsStore,
-        modelContainer: ModelContainer = PersistenceController.container
+        metaStore: MetaStore = PersistenceController.shared
     ) {
         self.notes = notes
         self.reminders = reminders
         self.settings = settings
-        self.modelContainer = modelContainer
+        self.metaStore = metaStore
         self.saveDebouncer = nil
         // Self is now fully initialized; safe for closures to capture it.
         self.saveDebouncer = Debouncer(delay: 1.2) { [weak self] in
@@ -175,7 +174,7 @@ final class AppState {
             reminderLists = loadedReminderLists
             reconcileQuickCaptureList()
             // Re-home any local metadata that still uses folder names as keys.
-            MetaStore.migrateFolderNameKeys(loadedFolders, in: modelContainer.mainContext)
+            metaStore.migrateFolderNameKeys(loadedFolders)
             await loadAllReminders()
             await subscribeToReminderChanges()
             statusMessage = nil
@@ -345,13 +344,11 @@ final class AppState {
     }
 
     private func markOpened(_ detail: NoteDetail) {
-        let context = modelContainer.mainContext
         // Folders are keyed by name in the AppleScript bridge, but local
         // metadata must store the real folder ID, never the folder name.
         guard let folderID = resolvedFolderID else { return }
-        let meta = MetaStore.noteMeta(createIfNeededFor: detail.id, folderID: folderID, in: context)
-        meta.lastOpenedAt = Date()
-        try? context.save()
+        _ = metaStore.noteMeta(createIfNeededFor: detail.id, folderID: folderID)
+        metaStore.update(detail.id) { $0.lastOpenedAt = Date() }
     }
 
     /// The real Apple Notes folder ID for the currently selected folder.
@@ -700,8 +697,7 @@ final class AppState {
                 filterReason = "completed"
             } else if item.dueEpoch == nil, horizon.days != nil {
                 filterReason = "dueMissing"
-            } else if
-                let dueEpoch = item.dueEpoch,
+            } else if let dueEpoch = item.dueEpoch,
                 let days = horizon.days,
                 let cutoff = calendar.date(
                     byAdding: .day,

@@ -127,7 +127,6 @@ final class ApplicationCoordinator {
             rootView: SettingsView()
                 .environment(appState)
                 .environment(settings)
-                .modelContainer(PersistenceController.container)
         )
         let window = NSWindow(contentViewController: hosting)
         window.title = "EdgeNoted Settings"

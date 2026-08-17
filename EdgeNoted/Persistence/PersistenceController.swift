@@ -1,30 +1,23 @@
-import SwiftData
+import Foundation
 
-/// Owns the SwiftData container for local-only EdgeNoted metadata.
+/// Owns the local metadata store for EdgeNoted's app-wide state. The store
+/// persists to a JSON file in Application Support (see `defaultFileURL`), so
+/// the app has no dependency on the SwiftData framework or its Xcode-only
+/// macro plugins.
 @MainActor
 enum PersistenceController {
-    static let container: ModelContainer = {
-        do {
-            let container = try makeContainer(isStoredInMemoryOnly: false)
-            Log.info("SwiftData store opened", category: .persistence)
-            return container
-        } catch {
-            Log.error("Failed to create ModelContainer", category: .persistence)
-            fatalError("Failed to create ModelContainer for EdgeNoted: \(error)")
-        }
-    }()
+    /// The app-wide store, backed by the on-disk JSON file.
+    static let shared = MetaStore(fileURL: defaultFileURL)
 
-    /// In-memory container for unit tests.
-    static func inMemoryContainer() throws -> ModelContainer {
-        try makeContainer(isStoredInMemoryOnly: true)
+    /// A purely in-memory store for unit tests.
+    static func makeInMemoryStore() -> MetaStore {
+        MetaStore(fileURL: nil)
     }
 
-    private static func makeContainer(isStoredInMemoryOnly: Bool) throws -> ModelContainer {
-        let schema = Schema([
-            NoteMeta.self,
-            Snippet.self,
-        ])
-        let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: isStoredInMemoryOnly)
-        return try ModelContainer(for: schema, configurations: [configuration])
+    static var defaultFileURL: URL {
+        let directory =
+            FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support")
+        return directory.appendingPathComponent("EdgeNoted/metadata.json")
     }
 }

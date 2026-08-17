@@ -1,4 +1,3 @@
-import SwiftData
 import SwiftUI
 
 @main
@@ -10,7 +9,6 @@ struct EdgeNotedApp: App {
             SettingsView()
                 .environment(appDelegate.appState)
                 .environment(appDelegate.settings)
-                .modelContainer(PersistenceController.container)
         }
     }
 }

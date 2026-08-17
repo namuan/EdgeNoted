@@ -10,7 +10,15 @@ dead-code:
 	periphery scan
 
 test:
-	swift test
+	@bash -c 'set -e; DEV="$${DEVELOPER_DIR:-$$(xcode-select -p)}"; \
+	case "$$DEV" in \
+	*CommandLineTools) \
+		echo "==> swift test (CLT toolchain: adding Testing.framework paths)"; \
+		swift test -Xswiftc -F -Xswiftc "$$DEV/Library/Developer/Frameworks" \
+			-Xlinker -rpath -Xlinker "$$DEV/Library/Developer/Frameworks" \
+			-Xlinker -rpath -Xlinker "$$DEV/Library/Developer/usr/lib" ;; \
+	*) swift test ;; \
+	esac'
 
 build:
 	@bash Scripts/build-app.sh

@@ -61,13 +61,24 @@ AppleScript helper from launching Notes/Reminders (`-600`) and blocked writes
 to `~/Library/Logs`. As a utility that can never be distributed on the Mac App
 Store anyway, a non-sandboxed build is the correct trade-off.
 
-## Build & run (no Xcode required)
+## Build & run (Command Line Tools only, no Xcode required)
+
+Only the Xcode Command Line Tools are needed (`xcode-select --install`) —
+full Xcode is **not** required. Earlier builds depended on SwiftData, whose
+`@Model`/`#Predicate` macros ship only inside the full Xcode app; the local
+metadata store now persists to a plain JSON file instead, so any modern Swift
+toolchain can build it. The app icon is generated with `sips` + `iconutil`
+rather than Xcode's `actool`, and `xcrun` is not required at all.
 
 ```bash
 make build       # compile with SwiftPM + create Build/EdgeNoted.app (signed)
 make run         # build (if needed) and launch the app
 make install     # build + install into ~/Applications (or double-click install.command)
 ```
+
+> First launch after this change starts with fresh local metadata
+> (folders’ ordering, pins, colors). Nothing stored in Apple Notes is affected
+> — Apple Notes remains the only source of note content.
 
 ## Backing up your notes
 

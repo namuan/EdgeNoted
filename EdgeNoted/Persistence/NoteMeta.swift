@@ -1,13 +1,14 @@
 import Foundation
-import SwiftData
 
 /// Local-only metadata for a note from Apple Notes. The note's content itself
 /// is never stored locally - Apple Notes remains the source of truth.
-@Model
-final class NoteMeta {
-    @Attribute(.unique) var noteID: String
+struct NoteMeta: Codable, Equatable, Identifiable, Sendable {
+    var id: String { noteID }
+
+    var noteID: String
     var folderID: String
-    // Retained in the schema so existing on-disk stores remain compatible.
+    // Reserved metadata, kept in the on-disk format for stability even though
+    // no UI drives it yet.
     var isPinned: Bool
     var orderIndex: Int
     var isFolded: Bool
@@ -30,19 +31,5 @@ final class NoteMeta {
         self.isFolded = isFolded
         self.colorHex = colorHex
         self.lastOpenedAt = lastOpenedAt
-    }
-}
-
-/// Retained in the schema so existing on-disk stores remain compatible.
-@Model
-final class Snippet {
-    var title: String
-    var text: String
-    var createdAt: Date
-
-    init(title: String, text: String, createdAt: Date = .now) {
-        self.title = title
-        self.text = text
-        self.createdAt = createdAt
     }
 }

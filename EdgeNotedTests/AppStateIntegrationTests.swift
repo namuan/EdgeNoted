@@ -4,7 +4,7 @@ import Testing
 @testable import EdgeNoted
 
 /// End-to-end AppState logic driven through the fake services and an
-/// in-memory SwiftData store. Never touches Apple Notes or Reminders.
+/// in-memory metadata store. Never touches Apple Notes or Reminders.
 @Suite("AppState integration with fake services")
 @MainActor
 struct AppStateIntegrationTests {
@@ -22,7 +22,7 @@ struct AppStateIntegrationTests {
         let notes = FakeNotesService()
         await notes.seed(id: "n1", name: "Meeting", body: "Discuss roadmap", folderName: "Work")
         let reminders = FakeRemindersService()
-        let container = try PersistenceController.inMemoryContainer()
+        let metaStore = PersistenceController.makeInMemoryStore()
         let suiteName = "AppStateIntegrationTests-\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             throw TestError.noDefaults
@@ -34,7 +34,7 @@ struct AppStateIntegrationTests {
         settings.configuredNoteID = "n1"
         settings.configuredNoteFolderName = "Work"
         settings.configuredNoteName = "Meeting"
-        let state = AppState(notes: notes, reminders: reminders, settings: settings, modelContainer: container)
+        let state = AppState(notes: notes, reminders: reminders, settings: settings, metaStore: metaStore)
         return Harness(state: state, notes: notes, reminders: reminders)
     }
 
@@ -110,8 +110,7 @@ struct AppStateIntegrationTests {
         let harness = try await makeHarness()
         await harness.state.startup()
         await waitForNoteOpen(harness.state)
-        let context = harness.state.modelContainer.mainContext
-        let meta = MetaStore.noteMeta(createIfNeededFor: "n1", folderID: "f-work", in: context)
+        let meta = harness.state.metaStore.noteMeta(createIfNeededFor: "n1", folderID: "f-work")
         #expect(meta.folderID == "f-work")  // real ID, not the "Work" name
         #expect(meta.folderID != "Work")
     }
